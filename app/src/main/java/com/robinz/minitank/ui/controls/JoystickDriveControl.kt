@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -67,7 +68,10 @@ fun JoystickDriveControl(
         contentAlignment = Alignment.Center
     ) {
         val arenaSize = minOf(maxWidth, maxHeight)
-        val maxRadius = (arenaSize.value * 0.38f).coerceIn(60f, 130f)
+        val density = LocalDensity.current
+        val maxRadius = with(density) {
+            (arenaSize * 0.38f).coerceIn(60.dp, 180.dp).toPx()
+        }
         val knobSize = (arenaSize.value * 0.28f).coerceIn(52f, 76f).dp
 
         Box(

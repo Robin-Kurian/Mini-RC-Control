@@ -12,6 +12,7 @@ import android.bluetooth.le.AdvertisingSetParameters
 import android.bluetooth.le.BluetoothLeAdvertiser
 import android.content.Context
 import android.os.Build
+import android.os.SystemClock
 import android.util.Log
 import com.robinz.minitank.protocol.ExtendedAdvertisingTankProtocol
 import kotlinx.coroutines.CoroutineScope
@@ -26,8 +27,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Broadcast engine for controlling the Mini Tank over Bluetooth 5 Extended Advertising
- * or legacy BLE advertising.
+ * Broadcast engine for controlling the Mini Tank over legacy BLE advertising.
  *
  * Transmits the 23-byte AD Structure (16 FF 00 00 [19 bytes payload]) verified from BTSnoop traces.
  */
@@ -38,6 +38,8 @@ class BleTankAdvertiser(
     companion object {
         private const val TAG = "BleTankAdvertiser"
         private const val IDLE_BROADCAST_INTERVAL_MS = 800L
+        private const val ACTIVE_BROADCAST_INTERVAL_MS = 200L
+        private const val MIN_ACTIVE_COMMAND_MS = 200L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -70,18 +72,20 @@ class BleTankAdvertiser(
     @Volatile private var currentIntensity: Byte = 0x00
     @Volatile private var currentAxis: Byte = ExtendedAdvertisingTankProtocol.AXIS_IDLE
     @Volatile private var isMoving: Boolean = false
+    @Volatile private var movementStartedAtMs: Long = 0L
 
     private var broadcastLoopJob: Job? = null
+    private var pendingIdleJob: Job? = null
     private var currentAdvertisingSet: AdvertisingSet? = null
+    @Volatile private var extendedStartPending = false
+    @Volatile private var legacyAdvertisingActive = false
 
     init {
-        val hasExtAdv = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            bluetoothAdapter?.isLeExtendedAdvertisingSupported == true
-        } else {
-            false
-        }
-        _useExtendedAdvertising.value = hasExtAdv
-        Log.i(TAG, "BleTankAdvertiser initialized (ExtendedAdvertisingSupported=$hasExtAdv)")
+        // The original app uses legacy/scannable advertising PDUs (HCI event
+        // properties 0x0012). The tank's observer does not react to Bluetooth 5
+        // extended advertising PDUs even when their manufacturer payload matches.
+        _useExtendedAdvertising.value = false
+        Log.i(TAG, "BleTankAdvertiser initialized (forced legacy advertising for tank compatibility)")
     }
 
     /**
@@ -97,56 +101,46 @@ class BleTankAdvertiser(
         steering: Float = 0f,
         speedCapPercent: Int
     ) {
-        when {
-            // Forward (throttle > +0.05f)
-            throttle > 0.05f -> {
-                val powerPercent = (throttle * speedCapPercent).toInt().coerceIn(1, 100)
-                currentDirection = ExtendedAdvertisingTankProtocol.STATE_FORWARD
-                currentIntensity = powerPercent.toByte()
-                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_FORWARD
-                isMoving = true
+        val throttleDirection = when {
+            throttle > 0.05f -> ExtendedAdvertisingTankProtocol.STATE_FORWARD.toInt()
+            throttle < -0.05f -> ExtendedAdvertisingTankProtocol.STATE_REVERSE.toInt()
+            else -> 0
+        }
+        val steeringDirection = when {
+            steering < -0.15f -> ExtendedAdvertisingTankProtocol.STATE_LEFT.toInt()
+            steering > 0.15f -> ExtendedAdvertisingTankProtocol.STATE_RIGHT.toInt()
+            else -> 0
+        }
+        val direction = throttleDirection or steeringDirection
 
-                if (!_isBroadcasting.value) {
-                    startBroadcasting()
-                }
-            }
-            // Reverse (throttle < -0.05f) - intensity ramps continuously with analog drag
-            throttle < -0.05f -> {
-                val powerPercent = (kotlin.math.abs(throttle) * speedCapPercent).toInt().coerceIn(1, 100)
-                currentDirection = ExtendedAdvertisingTankProtocol.STATE_REVERSE
-                currentIntensity = powerPercent.toByte()
-                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_REVERSE
-                isMoving = true
+        if (direction == 0) {
+            resetToIdle()
+            return
+        }
 
-                if (!_isBroadcasting.value) {
-                    startBroadcasting()
-                }
-            }
-            // Left (steering < -0.15f) - confirmed Left with intensity 0x00
-            steering < -0.15f -> {
-                currentDirection = ExtendedAdvertisingTankProtocol.STATE_LEFT
-                currentIntensity = 0x00
-                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_LEFT
-                isMoving = true
+        pendingIdleJob?.cancel()
+        pendingIdleJob = null
+        if (!isMoving) {
+            movementStartedAtMs = SystemClock.elapsedRealtime()
+        }
+        currentDirection = direction.toByte()
+        currentIntensity = if (throttleDirection != 0) {
+            (kotlin.math.abs(throttle) * speedCapPercent)
+                .toInt()
+                .coerceIn(1, 100)
+                .toByte()
+        } else {
+            0x00
+        }
+        currentAxis = if (throttleDirection == ExtendedAdvertisingTankProtocol.STATE_FORWARD.toInt()) {
+            ExtendedAdvertisingTankProtocol.AXIS_FORWARD
+        } else {
+            ExtendedAdvertisingTankProtocol.AXIS_IDLE
+        }
+        isMoving = true
 
-                if (!_isBroadcasting.value) {
-                    startBroadcasting()
-                }
-            }
-            // Right (steering > 0.15f) - confirmed Right with intensity 0x00
-            steering > 0.15f -> {
-                currentDirection = ExtendedAdvertisingTankProtocol.STATE_RIGHT
-                currentIntensity = 0x00
-                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_RIGHT
-                isMoving = true
-
-                if (!_isBroadcasting.value) {
-                    startBroadcasting()
-                }
-            }
-            else -> {
-                resetToIdle()
-            }
+        if (!_isBroadcasting.value) {
+            startBroadcasting()
         }
     }
 
@@ -169,6 +163,27 @@ class BleTankAdvertiser(
      * Immediately transmits neutral IDLE packet if broadcasting to guarantee instant fail-safe stop.
      */
     fun resetToIdle() {
+        val remainingHoldMs = MIN_ACTIVE_COMMAND_MS -
+            (SystemClock.elapsedRealtime() - movementStartedAtMs)
+        if (isMoving && remainingHoldMs > 0L) {
+            pendingIdleJob?.cancel()
+            pendingIdleJob = scope.launch {
+                delay(remainingHoldMs)
+                applyIdleNow()
+            }
+            return
+        }
+        applyIdleNow()
+    }
+
+    /** Immediately sends neutral, bypassing the short tap latch for emergency/lifecycle stops. */
+    fun forceIdle() {
+        pendingIdleJob?.cancel()
+        pendingIdleJob = null
+        applyIdleNow()
+    }
+
+    private fun applyIdleNow() {
         val wasMoving = isMoving
         currentDirection = ExtendedAdvertisingTankProtocol.STATE_IDLE
         currentIntensity = 0x00
@@ -218,8 +233,10 @@ class BleTankAdvertiser(
                 // Advance counter (0x00..0xFF)
                 _rollingCounter.value = (counter + 1) and 0xFF
 
-                // Fast 50ms pacing while actively driving, 800ms while idle
-                val delayMs = if (isMoving) 50L else IDLE_BROADCAST_INTERVAL_MS
+                // The original app replaces active packets about every 200ms. The
+                // controller advertises at 100-131ms, so faster replacement can
+                // cancel a packet before it reaches the air.
+                val delayMs = if (isMoving) ACTIVE_BROADCAST_INTERVAL_MS else IDLE_BROADCAST_INTERVAL_MS
                 delay(delayMs)
             }
         }
@@ -229,11 +246,34 @@ class BleTankAdvertiser(
      * Stops continuous BLE broadcast loop.
      */
     fun stopBroadcasting() {
+        if (!_isBroadcasting.value) {
+            stopActiveAdvertising()
+            return
+        }
         broadcastLoopJob?.cancel()
         broadcastLoopJob = null
+        pendingIdleJob?.cancel()
+        pendingIdleJob = null
         _isBroadcasting.value = false
-        stopActiveAdvertising()
-        Log.i(TAG, "Stopped BLE Tank broadcast loop")
+        currentDirection = ExtendedAdvertisingTankProtocol.STATE_IDLE
+        currentIntensity = 0x00
+        currentAxis = ExtendedAdvertisingTankProtocol.AXIS_IDLE
+        isMoving = false
+
+        // Keep neutral on air briefly before disabling advertising. A remote-control
+        // stop must not depend on the receiver having heard the previous single packet.
+        scope.launch {
+            repeat(3) {
+                val counter = _rollingCounter.value
+                val payload = ExtendedAdvertisingTankProtocol.buildIdleData(counter)
+                _lastBroadcastHex.value = ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(payload)
+                transmitPacket(payload)
+                _rollingCounter.value = (counter + 1) and 0xFF
+                delay(60L)
+            }
+            stopActiveAdvertising()
+            Log.i(TAG, "Stopped BLE Tank broadcast loop after neutral burst")
+        }
     }
 
     private fun transmitPacket(manufacturerData: ByteArray) {
@@ -245,11 +285,7 @@ class BleTankAdvertiser(
             .setIncludeTxPowerLevel(false)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && _useExtendedAdvertising.value) {
-            transmitExtendedAdvertising(advertiseData)
-        } else {
-            transmitLegacyAdvertising(adv, advertiseData)
-        }
+        transmitLegacyAdvertising(adv, advertiseData)
     }
 
     private fun transmitLegacyAdvertising(
@@ -260,10 +296,14 @@ class BleTankAdvertiser(
             .setAdvertiseMode(AdvertiseSettings.ADVERTISE_MODE_LOW_LATENCY)
             .setTxPowerLevel(AdvertiseSettings.ADVERTISE_TX_POWER_HIGH)
             .setConnectable(false)
-            .setTimeout(600) // Transmit short burst for each counter update
+            .setTimeout(0)
             .build()
 
         try {
+            if (legacyAdvertisingActive) {
+                adv.stopAdvertising(legacyCallback)
+                legacyAdvertisingActive = false
+            }
             adv.startAdvertising(settings, advertiseData, legacyCallback)
         } catch (e: Exception) {
             Log.e(TAG, "Error starting legacy advertising: ${e.message}")
@@ -283,12 +323,14 @@ class BleTankAdvertiser(
             .build()
 
         try {
-            if (currentAdvertisingSet == null) {
+            if (currentAdvertisingSet == null && !extendedStartPending) {
+                extendedStartPending = true
                 adv.startAdvertisingSet(parameters, advertiseData, null, null, null, extendedCallback)
-            } else {
+            } else if (currentAdvertisingSet != null) {
                 currentAdvertisingSet?.setAdvertisingData(advertiseData)
             }
         } catch (e: Exception) {
+            extendedStartPending = false
             Log.w(TAG, "Extended advertising unsupported or failed, falling back to legacy: ${e.message}")
             _useExtendedAdvertising.value = false
             transmitLegacyAdvertising(adv, advertiseData)
@@ -299,6 +341,7 @@ class BleTankAdvertiser(
         val adv = advertiser ?: return
         try {
             adv.stopAdvertising(legacyCallback)
+            legacyAdvertisingActive = false
         } catch (e: Exception) {
             Log.w(TAG, "Error stopping legacy advertising: ${e.message}")
         }
@@ -310,12 +353,14 @@ class BleTankAdvertiser(
                 Log.w(TAG, "Error stopping extended advertising: ${e.message}")
             }
             currentAdvertisingSet = null
+            extendedStartPending = false
         }
     }
 
     private val legacyCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-            // Success
+            legacyAdvertisingActive = true
+            _lastError.value = null
         }
 
         override fun onStartFailure(errorCode: Int) {
@@ -329,7 +374,7 @@ class BleTankAdvertiser(
             }
             Log.w(TAG, "Legacy advertising error: $msg")
             _lastError.value = msg
-            resetToIdle()
+            legacyAdvertisingActive = false
         }
     }
 
@@ -340,16 +385,20 @@ class BleTankAdvertiser(
                 txPower: Int,
                 status: Int
             ) {
+                extendedStartPending = false
                 if (status == ADVERTISE_SUCCESS) {
                     currentAdvertisingSet = advertisingSet
+                    _lastError.value = null
                 } else {
                     Log.w(TAG, "Extended advertising set failed with status $status, falling back to legacy")
                     _useExtendedAdvertising.value = false
+                    _lastError.value = "Extended advertising failed ($status); using legacy mode"
                 }
             }
 
             override fun onAdvertisingSetStopped(advertisingSet: AdvertisingSet?) {
                 currentAdvertisingSet = null
+                extendedStartPending = false
             }
         }
     } else null

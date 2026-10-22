@@ -40,7 +40,7 @@ data class TankUiState(
     val connectedDeviceName: String? = null,
     val connectedDeviceAddress: String? = null,
     val speedCapPercent: Int = 20,
-    val controlMode: ControlMode = ControlMode.SLIDERS,
+    val controlMode: ControlMode = ControlMode.BUTTONS,
     val hapticFeedbackEnabled: Boolean = true,
     val autoReconnectEnabled: Boolean = true,
     val lightsEnabled: Boolean = false,
@@ -306,12 +306,19 @@ class TankViewModel(
         bleAdvertiser.resetToIdle()
     }
 
+    fun onLifecycleSafetyStop() {
+        driveController.reset()
+        syncDriveState()
+        bleClient.sendStopCommand()
+        bleAdvertiser.forceIdle()
+    }
+
     fun onEmergencyStop() {
         stopLightsSlowBlink()
         driveController.reset()
         syncDriveState()
         bleClient.triggerFailSafeStop()
-        bleAdvertiser.resetToIdle()
+        bleAdvertiser.forceIdle()
         vibrateEmergency()
     }
 
@@ -605,6 +612,7 @@ class TankViewModel(
         super.onCleared()
         stopLightsSlowBlink()
         stopGyroSensor()
+        bleAdvertiser.stopBroadcasting()
         bleClient.disconnect(cleanShutdown = true)
     }
 }

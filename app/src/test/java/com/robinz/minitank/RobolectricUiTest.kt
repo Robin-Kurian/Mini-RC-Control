@@ -5,6 +5,9 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
+import com.robinz.minitank.ble.DiscoveredDevice
+import com.robinz.minitank.ui.screens.ScanDeviceDialog
 import com.robinz.minitank.controller.ControlMode
 import com.robinz.minitank.ui.TankUiState
 import com.robinz.minitank.ui.screens.MainControllerScreen
@@ -23,6 +26,40 @@ class RobolectricUiTest {
 
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w800dp-h360dp-land")
+    fun bluetoothDevicesRemainReachableInLandscape() {
+        assertBluetoothDialogScrolls()
+    }
+
+    @Test
+    @Config(sdk = [34], qualifiers = "w360dp-h800dp-port")
+    fun bluetoothDevicesRemainReachableInPortrait() {
+        assertBluetoothDialogScrolls()
+    }
+
+    private fun assertBluetoothDialogScrolls() {
+        var selected: String? = null
+        val devices = (1..20).map {
+            DiscoveredDevice("Tank $it", "AA:BB:CC:DD:EE:%02X".format(it), -60, true)
+        } + DiscoveredDevice(null, "11:22:33:44:55:66", -80, false)
+        composeTestRule.setContent {
+            RobinMiniTankTheme {
+                ScanDeviceDialog(
+                    scannedDevices = devices,
+                    isScanning = true,
+                    onStartScan = {},
+                    onStopScan = {},
+                    onSelectDevice = { address, _ -> selected = address },
+                    onDismiss = {}
+                )
+            }
+        }
+        composeTestRule.onNodeWithText("Show All").performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText("Tank 20").performScrollTo().assertIsDisplayed().performClick()
+        assertEquals(devices[19].address, selected)
+    }
 
     @Test
     fun testMainControllerScreenDisplaysTitleAndCenteredSpeed() {

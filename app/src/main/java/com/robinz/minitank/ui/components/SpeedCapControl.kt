@@ -45,11 +45,12 @@ fun SpeedCapControl(
     onSpeedCapChanged: (Int) -> Unit,
     onIncrement: () -> Unit,
     onDecrement: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    compact: Boolean = false
 ) {
     Column(
         modifier = modifier
-            .widthIn(min = 220.dp, max = 340.dp)
+            .widthIn(min = if (compact) 180.dp else 220.dp, max = 340.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(DarkSurfaceElevated)
             .border(1.dp, OutlineBorder, RoundedCornerShape(16.dp))
@@ -58,7 +59,7 @@ fun SpeedCapControl(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // Label
-        Text(
+        if (!compact) Text(
             text = "MAX SPEED CAP",
             style = MaterialTheme.typography.labelSmall.copy(
                 letterSpacing = 1.2.sp,
@@ -127,7 +128,7 @@ fun SpeedCapControl(
         }
 
         // Stepped Slider: 20% to 100% in 8 steps (10% increments)
-        Slider(
+        if (!compact) Slider(
             value = speedCapPercent.toFloat(),
             onValueChange = { newValue ->
                 val step = (newValue / 10f).roundToInt() * 10

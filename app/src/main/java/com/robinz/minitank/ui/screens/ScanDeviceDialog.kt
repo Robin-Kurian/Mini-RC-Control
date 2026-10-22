@@ -4,13 +4,21 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,11 +53,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.robinz.minitank.ble.ConnectionState
 import com.robinz.minitank.ble.DiscoveredDevice
 import com.robinz.minitank.ui.theme.CyanAccent
@@ -114,18 +124,28 @@ fun ScanDeviceDialog(
 
     val hiddenCount = scannedDevices.size - filteredList.size
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = DarkSurfaceElevated,
             modifier = Modifier
+                .widthIn(max = 560.dp)
                 .fillMaxWidth()
+                .heightIn(max = maxHeight)
                 .border(1.dp, OutlineBorder, RoundedCornerShape(20.dp))
                 .testTag("scan_device_dialog")
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(18.dp)
             ) {
                 // Header Row
@@ -134,7 +154,7 @@ fun ScanDeviceDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.BluetoothSearching,
                             contentDescription = null,
@@ -143,7 +163,9 @@ fun ScanDeviceDialog(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Connect Mini Tank",
+                            text = "Mini Tank Control Signal",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.titleLarge.copy(
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -225,7 +247,10 @@ fun ScanDeviceDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(
+                        modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
                         ScanFilterMode.values().forEach { mode ->
                             FilterChip(
                                 selected = filterMode == mode,
@@ -282,6 +307,7 @@ fun ScanDeviceDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
+                        modifier = Modifier.weight(1f),
                         text = if (scannedDevices.isEmpty()) {
                             "Scanning 2.4 GHz BLE band..."
                         } else {
@@ -297,6 +323,7 @@ fun ScanDeviceDialog(
                     if (hiddenCount > 0 && filterMode == ScanFilterMode.TANKS_ONLY) {
                         Text(
                             text = "Show All",
+                            maxLines = 1,
                             modifier = Modifier
                                 .clickable { filterMode = ScanFilterMode.ALL }
                                 .padding(4.dp),
@@ -338,7 +365,7 @@ fun ScanDeviceDialog(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "BLE Broadcast Mode",
+                                    text = "One-way control signal",
                                     style = MaterialTheme.typography.labelMedium.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = if (isBroadcasting) CyanAccent else TextPrimary,
@@ -348,7 +375,11 @@ fun ScanDeviceDialog(
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (isBroadcasting) "Broadcasting 21-byte packets (0.8s IDLE)" else "For tanks controlled via BLE advertisements",
+                                text = if (isBroadcasting) {
+                                    "Phone is transmitting • car reception cannot be verified"
+                                } else {
+                                    "Turn the car on, then start the control signal"
+                                },
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     fontSize = 10.sp,
                                     color = TextSecondary
@@ -365,7 +396,7 @@ fun ScanDeviceDialog(
                             modifier = Modifier.height(30.dp)
                         ) {
                             Text(
-                                text = if (isBroadcasting) "Stop" else "Start",
+                                text = if (isBroadcasting) "Stop Signal" else "Start Signal",
                                 color = if (isBroadcasting) CyanAccent else TextPrimary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -496,7 +527,7 @@ fun ScanDeviceDialog(
                         ) {
                             Text(
                                 text = if (filterMode == ScanFilterMode.TANKS_ONLY && scannedDevices.isNotEmpty()) {
-                                    "No tank candidates detected yet"
+                                    "The car does not need to appear in this list"
                                 } else if (isScanning) {
                                     "Searching for nearby Bluetooth tanks..."
                                 } else {
@@ -510,7 +541,7 @@ fun ScanDeviceDialog(
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = if (filterMode == ScanFilterMode.TANKS_ONLY && hiddenCount > 0) {
-                                    "$hiddenCount other devices (mice, beacons) were filtered out."
+                                    "This tank listens for a one-way signal; scanning cannot confirm reception."
                                 } else {
                                     "Ensure your mini tank is powered ON with battery connected."
                                 },
@@ -541,13 +572,13 @@ fun ScanDeviceDialog(
                         }
                     }
                 } else {
-                    LazyColumn(
+                    Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(240.dp),
+                            .testTag("scan_device_list"),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(filteredList, key = { it.address }) { device ->
+                        filteredList.forEach { device ->
                             val isConnectingThis = connectingAddress.equals(device.address, ignoreCase = true)
                             DeviceRowItem(
                                 device = device,
@@ -565,6 +596,8 @@ fun ScanDeviceDialog(
             }
         }
     }
+}
+
 }
 
 @Composable

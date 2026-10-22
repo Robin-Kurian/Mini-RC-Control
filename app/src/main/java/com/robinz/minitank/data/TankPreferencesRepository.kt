@@ -19,7 +19,7 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "ta
 
 data class TankPreferences(
     val speedCapPercent: Int = 20,
-    val controlMode: ControlMode = ControlMode.SLIDERS,
+    val controlMode: ControlMode = ControlMode.BUTTONS,
     val hapticFeedbackEnabled: Boolean = true,
     val autoReconnectEnabled: Boolean = true,
     val lastDeviceAddress: String? = null,
@@ -49,11 +49,11 @@ class TankPreferencesRepository(private val context: Context) {
         }
         .map { preferences ->
             val speedCap = preferences[PreferencesKeys.SPEED_CAP] ?: 20
-            val modeStr = preferences[PreferencesKeys.CONTROL_MODE] ?: ControlMode.SLIDERS.name
+            val modeStr = preferences[PreferencesKeys.CONTROL_MODE] ?: ControlMode.BUTTONS.name
             val mode = try {
                 ControlMode.valueOf(modeStr)
             } catch (e: Exception) {
-                ControlMode.SLIDERS
+                ControlMode.BUTTONS
             }
             val haptic = preferences[PreferencesKeys.HAPTIC_ENABLED] ?: true
             val autoReconnect = preferences[PreferencesKeys.AUTO_RECONNECT] ?: true

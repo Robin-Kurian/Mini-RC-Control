@@ -253,34 +253,37 @@ private fun LandscapeLayout(
 
         Spacer(modifier = Modifier.height(4.dp))
 
-        // Bottom Dashboard Row (Prominent Centered Speed Cap + STOP Button + HUD)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // Mode Selector Chips
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             ControlModeSelectorRow(
                 currentMode = uiState.controlMode,
                 onSelectMode = onSelectControlMode
             )
+        }
 
+        // Bottom Dashboard Row (Prominent Centered Speed Cap + STOP Button + HUD)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(72.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            // Mode Selector Chips
             if (uiState.controlMode != ControlMode.JOYSTICK) {
                 // Centered Speed Cap
                 SpeedCapControl(
                     speedCapPercent = uiState.speedCapPercent,
                     onSpeedCapChanged = onSpeedCapChanged,
                     onIncrement = onIncrementSpeedCap,
-                    onDecrement = onDecrementSpeedCap
+                    onDecrement = onDecrementSpeedCap,
+                    compact = true
                 )
             }
 
             // Telemetry HUD and STOP Button
             Row(
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 TelemetryHud(
                     rawThrottle = uiState.rawThrottle,
@@ -288,7 +291,7 @@ private fun LandscapeLayout(
                     cappedThrottle = uiState.cappedThrottle,
                     speedCapPercent = uiState.speedCapPercent,
                     isConnected = uiState.connectionState.isConnected,
-                    modifier = Modifier.widthIn(min = 160.dp, max = 200.dp)
+                    modifier = Modifier.widthIn(max = 200.dp)
                 )
                 EmergencyStopButton(
                     onClick = onEmergencyStop,

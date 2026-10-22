@@ -76,13 +76,13 @@ fun TankApp(viewModel: TankViewModel) {
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) {
-                viewModel.onDriveReleased()
+                viewModel.onLifecycleSafetyStop()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            viewModel.onDriveReleased()
+            viewModel.onLifecycleSafetyStop()
         }
     }
 

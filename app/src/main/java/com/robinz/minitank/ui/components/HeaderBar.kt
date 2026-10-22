@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,6 +57,7 @@ import com.robinz.minitank.ui.theme.WarningAmber
 import androidx.compose.material.icons.filled.Sensors
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun HeaderBar(
     connectionState: ConnectionState,
     connectedDeviceName: String?,
@@ -81,7 +85,8 @@ fun HeaderBar(
         label = "statusColor"
     )
 
-    Row(
+    val narrow = LocalConfiguration.current.screenWidthDp < 600
+    FlowRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
@@ -89,7 +94,8 @@ fun HeaderBar(
             .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
             .padding(horizontal = 10.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        maxItemsInEachRow = if (narrow) 1 else 2
     ) {
         // App Title & Status Indicator
         Row(
@@ -128,7 +134,7 @@ fun HeaderBar(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = "BROADCAST",
+                                text = "SIGNAL",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -140,7 +146,7 @@ fun HeaderBar(
                 }
                 Text(
                     text = if (isBroadcasting) {
-                        "Broadcasting 0.8s IDLE"
+                        "Control signal ON • car not verified"
                     } else when (connectionState) {
                         is ConnectionState.Connected -> connectedDeviceName ?: "Tank Connected"
                         is ConnectionState.Connecting -> "Connecting..."
@@ -160,12 +166,11 @@ fun HeaderBar(
             }
         }
 
-        Spacer(modifier = Modifier.width(6.dp))
-
         // Action Buttons: Broadcast, BLE, Headlights, Blink 1s, Sound, Route, Settings
         Row(
+            modifier = if (narrow) Modifier.fillMaxWidth() else Modifier,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(3.dp)
+            horizontalArrangement = if (narrow) Arrangement.SpaceBetween else Arrangement.spacedBy(3.dp)
         ) {
             // BLE Extended Advertising / Broadcast Toggle
             IconButton(
@@ -192,7 +197,7 @@ fun HeaderBar(
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
-                        text = if (isBroadcasting) "ADV" else "OFF",
+                        text = if (isBroadcasting) "TX" else "OFF",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontSize = 7.sp,
                             fontWeight = FontWeight.Bold,
