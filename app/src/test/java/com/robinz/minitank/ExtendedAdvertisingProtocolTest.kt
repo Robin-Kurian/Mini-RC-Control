@@ -17,6 +17,20 @@ class ExtendedAdvertisingProtocolTest {
     )
 
     @Test
+    fun testConfirmedHeadlightsOn() {
+        // Captured light-on payload: byte 12 is 0x01 and participates in the checksum.
+        val data = ExtendedAdvertisingTankProtocol.buildIdleData(
+            counter = 0xBF,
+            lightsEnabled = true,
+            customHeader = session633566
+        )
+        assertEquals(
+            "16 FF 00 00 04 07 03 FD C1 63 35 66 00 00 04 64 01 00 BF 00 00 00 3B",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data)
+        )
+    }
+
+    @Test
     fun testConfirmedIdleExamples() {
         // Sample 1: 16 FF 00 00 04 07 03 FD C1 63 35 66 00 00 04 64 00 00 82 00 00 00 07
         val data1 = ExtendedAdvertisingTankProtocol.buildIdleData(counter = 0x82, customHeader = session633566)

@@ -203,37 +203,14 @@ private fun LandscapeLayout(
                     )
                 }
                 ControlMode.JOYSTICK -> {
-                    Row(
+                    Box(
                         modifier = Modifier.weight(1f).fillMaxHeight(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                        contentAlignment = Alignment.Center
                     ) {
-                        // Left Speed Cap Vertical Placement in Joystick Mode
-                        Column(
-                            modifier = Modifier.width(220.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            SpeedCapControl(
-                                speedCapPercent = uiState.speedCapPercent,
-                                onSpeedCapChanged = onSpeedCapChanged,
-                                onIncrement = onIncrementSpeedCap,
-                                onDecrement = onDecrementSpeedCap
-                            )
-                        }
-
-                        // Right 360 Joystick Arena
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            JoystickDriveControl(
-                                onJoystickChanged = onJoystickInput,
-                                onReleased = onDriveReleased
-                            )
-                        }
+                        JoystickDriveControl(
+                            onJoystickChanged = onJoystickInput,
+                            onReleased = onDriveReleased
+                        )
                     }
                 }
                 ControlMode.GYRO -> {
@@ -249,27 +226,16 @@ private fun LandscapeLayout(
                     )
                 }
             }
-        }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ControlModeSelectorRow(
-                currentMode = uiState.controlMode,
-                onSelectMode = onSelectControlMode
-            )
-        }
-
-        // Bottom Dashboard Row (Prominent Centered Speed Cap + STOP Button + HUD)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(72.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            // Mode Selector Chips
-            if (uiState.controlMode != ControlMode.JOYSTICK) {
-                // Centered Speed Cap
+            // Keep the dashboard on the right so the drive controls can use more height.
+            Column(
+                modifier = Modifier
+                    .width(240.dp)
+                    .fillMaxHeight()
+                    .padding(start = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceEvenly
+            ) {
                 SpeedCapControl(
                     speedCapPercent = uiState.speedCapPercent,
                     onSpeedCapChanged = onSpeedCapChanged,
@@ -277,14 +243,6 @@ private fun LandscapeLayout(
                     onDecrement = onDecrementSpeedCap,
                     compact = true
                 )
-            }
-
-            // Telemetry HUD and STOP Button
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
                 TelemetryHud(
                     rawThrottle = uiState.rawThrottle,
                     rawSteering = uiState.rawSteering,
@@ -299,6 +257,16 @@ private fun LandscapeLayout(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+            ControlModeSelectorRow(
+                currentMode = uiState.controlMode,
+                onSelectMode = onSelectControlMode
+            )
+        }
+
     }
 }
 

@@ -24,8 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDownward
-import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -44,8 +42,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robinz.minitank.ui.theme.CyanAccent
@@ -61,6 +62,8 @@ import kotlin.math.roundToInt
 private class SliderState {
     var throttle = 0f
     var steer = 0f
+    var throttleMaxTravel = 1f
+    var steerMaxTravel = 1f
 }
 
 @Composable
@@ -76,13 +79,21 @@ fun SlidersDriveControl(
         // Left Vertical Slider (Throttle / Brake)
         VerticalThrottleSlider(
             modifier = throttleMod,
+            showContainer = false,
+            labelsBesideTrack = isLandscape,
             onDrag = { dy, maxTravel ->
                 sliderState.throttle = dy
-                onSlidersChanged(dy, maxTravel, sliderState.steer, 120f)
+                sliderState.throttleMaxTravel = maxTravel
+                onSlidersChanged(dy, maxTravel, sliderState.steer, sliderState.steerMaxTravel)
             },
             onRelease = {
                 sliderState.throttle = 0f
-                onSlidersChanged(0f, 120f, sliderState.steer, 120f)
+                onSlidersChanged(
+                    0f,
+                    sliderState.throttleMaxTravel,
+                    sliderState.steer,
+                    sliderState.steerMaxTravel
+                )
                 if (sliderState.steer == 0f) onReleased()
             }
         )
@@ -92,11 +103,17 @@ fun SlidersDriveControl(
             modifier = steerMod,
             onDrag = { dx, maxTravel ->
                 sliderState.steer = dx
-                onSlidersChanged(sliderState.throttle, 120f, dx, maxTravel)
+                sliderState.steerMaxTravel = maxTravel
+                onSlidersChanged(sliderState.throttle, sliderState.throttleMaxTravel, dx, maxTravel)
             },
             onRelease = {
                 sliderState.steer = 0f
-                onSlidersChanged(sliderState.throttle, 120f, 0f, 120f)
+                onSlidersChanged(
+                    sliderState.throttle,
+                    sliderState.throttleMaxTravel,
+                    0f,
+                    sliderState.steerMaxTravel
+                )
                 if (sliderState.throttle == 0f) onReleased()
             }
         )
@@ -110,31 +127,72 @@ fun SlidersDriveControl(
         ) {
             content(
                 Modifier
-                    .weight(1f)
+                    .weight(0.7f)
                     .fillMaxHeight()
                     .padding(start = 16.dp, end = 8.dp),
                 Modifier
-                    .weight(1f)
+                    .weight(1.3f)
                     .fillMaxHeight()
                     .padding(start = 8.dp, end = 16.dp)
             )
         }
     } else {
-        Column(
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceEvenly,
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            content(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1.1f)
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                Modifier
-                    .fillMaxWidth()
-                    .weight(0.9f)
-                    .padding(horizontal = 16.dp, vertical = 6.dp)
-            )
+        BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+            val sliderHeight = maxHeight.coerceAtMost(300.dp)
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(sliderHeight),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                VerticalThrottleSlider(
+                    Modifier
+                        .width(104.dp)
+                        .fillMaxHeight()
+                        .padding(start = 4.dp),
+                    onDrag = { dy, maxTravel ->
+                        sliderState.throttle = dy
+                        sliderState.throttleMaxTravel = maxTravel
+                        onSlidersChanged(dy, maxTravel, sliderState.steer, sliderState.steerMaxTravel)
+                    },
+                    onRelease = {
+                        sliderState.throttle = 0f
+                        onSlidersChanged(
+                            0f,
+                            sliderState.throttleMaxTravel,
+                            sliderState.steer,
+                            sliderState.steerMaxTravel
+                        )
+                        if (sliderState.steer == 0f) onReleased()
+                    },
+                    showContainer = false
+                )
+                HorizontalSteeringSlider(
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(end = 4.dp),
+                    onDrag = { dx, maxTravel ->
+                        sliderState.steer = dx
+                        sliderState.steerMaxTravel = maxTravel
+                        onSlidersChanged(
+                            sliderState.throttle,
+                            sliderState.throttleMaxTravel,
+                            dx,
+                            maxTravel
+                        )
+                    },
+                    onRelease = {
+                        sliderState.steer = 0f
+                        onSlidersChanged(
+                            sliderState.throttle,
+                            sliderState.throttleMaxTravel,
+                            0f,
+                            sliderState.steerMaxTravel
+                        )
+                        if (sliderState.throttle == 0f) onReleased()
+                    }
+                )
+            }
         }
     }
 }
@@ -143,56 +201,64 @@ fun SlidersDriveControl(
 fun VerticalThrottleSlider(
     modifier: Modifier = Modifier,
     onDrag: (deltaY: Float, maxTravel: Float) -> Unit,
-    onRelease: () -> Unit
+    onRelease: () -> Unit,
+    showContainer: Boolean = true,
+    labelsBesideTrack: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
     val thumbOffsetAnim = remember { Animatable(0f) }
     var isDragging by remember { mutableStateOf(false) }
+    var trackSize by remember { mutableStateOf(IntSize.Zero) }
+    val thumbSize = 56.dp
+    val thumbSizePx = with(LocalDensity.current) { thumbSize.roundToPx() }
 
     BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(DarkSurfaceElevated)
-            .border(1.5.dp, if (isDragging) CyanAccent else OutlineBorder, RoundedCornerShape(20.dp))
-            .padding(12.dp)
+            .then(
+                if (showContainer) {
+                    Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(DarkSurfaceElevated)
+                        .border(
+                            1.5.dp,
+                            if (isDragging) CyanAccent else OutlineBorder,
+                            RoundedCornerShape(20.dp)
+                        )
+                        .padding(8.dp)
+                } else {
+                    Modifier.padding(vertical = 2.dp)
+                }
+            )
             .testTag("vertical_throttle_slider"),
         contentAlignment = Alignment.Center
     ) {
-        val totalHeight = maxHeight.value
-        val maxTravel = (totalHeight * 0.42f).coerceAtLeast(60f)
+        val maxTravel = ((trackSize.height - trackSize.width.coerceAtMost(thumbSizePx)) / 2f)
+            .coerceAtLeast(1f)
 
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxSize()
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
             // Forward Label
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.ArrowUpward,
-                    contentDescription = null,
-                    tint = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted,
-                    modifier = Modifier.size(16.dp)
+            Text(
+                text = "ACCEL",
+                modifier = Modifier.align(
+                    if (labelsBesideTrack) Alignment.TopStart else Alignment.TopCenter
+                ),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "ACCEL",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted
-                    )
-                )
-            }
+            )
 
             // Slider Track Area with Thumb
             Box(
                 modifier = Modifier
-                    .weight(1f)
+                    .align(Alignment.Center)
+                    .fillMaxHeight(if (labelsBesideTrack) 1f else 0.82f)
                     .width(72.dp)
+                    .onSizeChanged { trackSize = it }
                     .clip(RoundedCornerShape(36.dp))
                     .background(DarkBackground)
                     .border(1.dp, OutlineBorder, RoundedCornerShape(36.dp))
-                    .pointerInput(Unit) {
+                    .pointerInput(maxTravel) {
                         detectDragGestures(
                             onDragStart = {
                                 isDragging = true
@@ -237,7 +303,7 @@ fun VerticalThrottleSlider(
                 // Interactive Thumb Knob
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(thumbSize)
                         .align(Alignment.Center)
                         .offset { IntOffset(0, thumbOffsetAnim.value.roundToInt()) }
                         .clip(CircleShape)
@@ -260,22 +326,16 @@ fun VerticalThrottleSlider(
             }
 
             // Reverse Label
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.ArrowDownward,
-                    contentDescription = null,
-                    tint = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted,
-                    modifier = Modifier.size(16.dp)
+            Text(
+                text = "REVERSE",
+                modifier = Modifier.align(
+                    if (labelsBesideTrack) Alignment.BottomStart else Alignment.BottomCenter
+                ),
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted
                 )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                    text = "REVERSE",
-                    style = MaterialTheme.typography.labelSmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted
-                    )
-                )
-            }
+            )
         }
     }
 }
@@ -289,23 +349,22 @@ fun HorizontalSteeringSlider(
     val coroutineScope = rememberCoroutineScope()
     val thumbOffsetAnim = remember { Animatable(0f) }
     var isDragging by remember { mutableStateOf(false) }
+    var trackSize by remember { mutableStateOf(IntSize.Zero) }
+    val thumbSize = 56.dp
+    val thumbSizePx = with(LocalDensity.current) { thumbSize.roundToPx() }
 
     BoxWithConstraints(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(DarkSurfaceElevated)
-            .border(1.5.dp, if (isDragging) CyanAccent else OutlineBorder, RoundedCornerShape(20.dp))
-            .padding(12.dp)
             .testTag("horizontal_steering_slider"),
         contentAlignment = Alignment.Center
     ) {
-        val totalWidth = maxWidth.value
-        val maxTravel = (totalWidth * 0.42f).coerceAtLeast(60f)
+        val maxTravel = ((trackSize.width - trackSize.height.coerceAtMost(thumbSizePx)) / 2f)
+            .coerceAtLeast(1f)
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize().padding(vertical = 4.dp, horizontal = 8.dp)
         ) {
             // Header
             Text(
@@ -321,10 +380,11 @@ fun HorizontalSteeringSlider(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
+                    .onSizeChanged { trackSize = it }
                     .clip(RoundedCornerShape(36.dp))
                     .background(DarkBackground)
                     .border(1.dp, OutlineBorder, RoundedCornerShape(36.dp))
-                    .pointerInput(Unit) {
+                    .pointerInput(maxTravel) {
                         detectDragGestures(
                             onDragStart = {
                                 isDragging = true
@@ -369,7 +429,7 @@ fun HorizontalSteeringSlider(
                 // Interactive Thumb Knob
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(thumbSize)
                         .align(Alignment.Center)
                         .offset { IntOffset(thumbOffsetAnim.value.roundToInt(), 0) }
                         .clip(CircleShape)

@@ -19,12 +19,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Broadcast engine for controlling the Mini Tank over legacy BLE advertising.
@@ -71,10 +73,12 @@ class BleTankAdvertiser(
     @Volatile private var currentDirection: Byte = ExtendedAdvertisingTankProtocol.STATE_IDLE
     @Volatile private var currentIntensity: Byte = 0x00
     @Volatile private var currentAxis: Byte = ExtendedAdvertisingTankProtocol.AXIS_IDLE
+    @Volatile private var lightsEnabled: Boolean = false
     @Volatile private var isMoving: Boolean = false
     @Volatile private var movementStartedAtMs: Long = 0L
 
     private var broadcastLoopJob: Job? = null
+    private val stateChanged = Channel<Unit>(Channel.CONFLATED)
     private var pendingIdleJob: Job? = null
     private var currentAdvertisingSet: AdvertisingSet? = null
     @Volatile private var extendedStartPending = false
@@ -158,6 +162,16 @@ class BleTankAdvertiser(
         isMoving = direction != ExtendedAdvertisingTankProtocol.STATE_IDLE
     }
 
+    /** Updates the verified headlight flag carried by every advertised control packet. */
+    fun setLights(enabled: Boolean) {
+        lightsEnabled = enabled
+        if (!_isBroadcasting.value) {
+            if (enabled) startBroadcasting()
+            return
+        }
+        stateChanged.trySend(Unit)
+    }
+
     /**
      * Resets control state to verified neutral idle.
      * Immediately transmits neutral IDLE packet if broadcasting to guarantee instant fail-safe stop.
@@ -192,7 +206,10 @@ class BleTankAdvertiser(
 
         if (_isBroadcasting.value && wasMoving) {
             val counter = _rollingCounter.value
-            val payload = ExtendedAdvertisingTankProtocol.buildIdleData(counter)
+            val payload = ExtendedAdvertisingTankProtocol.buildIdleData(
+                counter = counter,
+                lightsEnabled = lightsEnabled
+            )
             _lastBroadcastHex.value = ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(payload)
             transmitPacket(payload)
             _rollingCounter.value = (counter + 1) and 0xFF
@@ -224,7 +241,8 @@ class BleTankAdvertiser(
                     intensity = currentIntensity,
                     axisType = currentAxis,
                     secondaryByte = ExtendedAdvertisingTankProtocol.CONSTANT_SECONDARY_BYTE,
-                    counter = counter
+                    counter = counter,
+                    lightsEnabled = lightsEnabled
                 )
 
                 _lastBroadcastHex.value = ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(payload)
@@ -236,8 +254,12 @@ class BleTankAdvertiser(
                 // The original app replaces active packets about every 200ms. The
                 // controller advertises at 100-131ms, so faster replacement can
                 // cancel a packet before it reaches the air.
-                val delayMs = if (isMoving) ACTIVE_BROADCAST_INTERVAL_MS else IDLE_BROADCAST_INTERVAL_MS
-                delay(delayMs)
+                val delayMs = if (isMoving || lightsEnabled) {
+                    ACTIVE_BROADCAST_INTERVAL_MS
+                } else {
+                    IDLE_BROADCAST_INTERVAL_MS
+                }
+                withTimeoutOrNull(delayMs) { stateChanged.receive() }
             }
         }
     }

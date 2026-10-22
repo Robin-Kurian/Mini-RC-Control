@@ -92,7 +92,7 @@ fun HeaderBar(
             .clip(RoundedCornerShape(12.dp))
             .background(DarkSurface)
             .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 10.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         maxItemsInEachRow = if (narrow) 1 else 2
@@ -104,7 +104,7 @@ fun HeaderBar(
                 .weight(1f, fill = false)
                 .clip(RoundedCornerShape(8.dp))
                 .clickable { onBluetoothClick() }
-                .padding(horizontal = 4.dp, vertical = 4.dp)
+                .padding(horizontal = 2.dp, vertical = 2.dp)
                 .testTag("connection_pill")
         ) {
             Box(
@@ -146,7 +146,7 @@ fun HeaderBar(
                 }
                 Text(
                     text = if (isBroadcasting) {
-                        "Car control active • one-way BLE"
+                        "ENGINE ON"
                     } else when (connectionState) {
                         is ConnectionState.Connected -> connectedDeviceName ?: "Tank Connected"
                         is ConnectionState.Connecting -> "Connecting..."
@@ -170,13 +170,13 @@ fun HeaderBar(
         Row(
             modifier = if (narrow) Modifier.fillMaxWidth() else Modifier,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = if (narrow) Arrangement.SpaceBetween else Arrangement.spacedBy(3.dp)
+            horizontalArrangement = if (narrow) Arrangement.SpaceBetween else Arrangement.spacedBy(6.dp)
         ) {
             // BLE Extended Advertising / Broadcast Toggle
             IconButton(
                 onClick = onToggleBroadcast,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isBroadcasting) CyanAccent.copy(alpha = 0.22f) else DarkSurface)
                     .border(
@@ -211,7 +211,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onBluetoothClick,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .testTag("bluetooth_button")
             ) {
                 Icon(
@@ -230,7 +230,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onLightsToggle,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .testTag("lights_toggle_button")
             ) {
                 Icon(
@@ -245,7 +245,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onLightsBlinkToggle,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (lightsBlinkEnabled) WarningAmber.copy(alpha = 0.22f) else DarkSurface)
                     .border(
@@ -281,7 +281,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onSoundToggle,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .testTag("sound_toggle_button")
             ) {
                 Icon(
@@ -296,7 +296,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onRouteClick,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .testTag("route_button")
             ) {
                 Icon(
@@ -311,7 +311,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onSettingsClick,
                 modifier = Modifier
-                    .size(34.dp)
+                    .size(36.dp)
                     .testTag("settings_button")
             ) {
                 Icon(

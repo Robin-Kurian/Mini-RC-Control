@@ -16,7 +16,8 @@ package com.robinz.minitank.protocol
  *     byte 9      = Power Intensity (e.g. 0x1E for 30%, 0x00 Idle)
  *     byte 10     = Axis / Control type (0x05 Forward, 0x04 Idle)
  *     byte 11     = Constant secondary value 0x64 (remains 100 decimal)
- *     bytes 12..13 = 0x00, 0x00
+ *     byte 12     = Headlight flag (0x01 on, 0x00 off)
+ *     byte 13     = 0x00
  *     byte 14     = Rolling counter (0x00..0xFF)
  *     bytes 15..17 = 0x00, 0x00, 0x00
  *     byte 18     = Checksum
@@ -98,6 +99,7 @@ object ExtendedAdvertisingTankProtocol {
         axisType: Byte,
         secondaryByte: Byte,
         counter: Byte,
+        lightsEnabled: Boolean = false,
         customHeader: ByteArray? = null
     ): Byte {
         var cs = 0xE9
@@ -109,7 +111,8 @@ object ExtendedAdvertisingTankProtocol {
         cs = cs xor (intensity.toInt() and 0xFF)
         cs = cs xor (axisType.toInt() and 0xFF)
         cs = cs xor (secondaryByte.toInt() and 0xFF)
-        // bytes 14..15 are 0x00
+        if (lightsEnabled) cs = cs xor 0x01
+        // byte 13 is 0x00
         cs = cs xor (counter.toInt() and 0xFF)
         // bytes 17..19 are 0x00
         return (cs and 0xFF).toByte()
@@ -124,11 +127,20 @@ object ExtendedAdvertisingTankProtocol {
         axisType: Byte,
         secondaryByte: Byte = CONSTANT_SECONDARY_BYTE,
         counter: Int,
+        lightsEnabled: Boolean = false,
         customHeader: ByteArray? = null
     ): ByteArray {
         val counterByte = (counter and 0xFF).toByte()
         val header = customHeader ?: getHeader()
-        val checksum = calculateChecksum(directionState, intensity, axisType, secondaryByte, counterByte, header)
+        val checksum = calculateChecksum(
+            directionState = directionState,
+            intensity = intensity,
+            axisType = axisType,
+            secondaryByte = secondaryByte,
+            counter = counterByte,
+            lightsEnabled = lightsEnabled,
+            customHeader = header
+        )
 
         val data = ByteArray(19)
         System.arraycopy(header, 0, data, 0, 8)
@@ -136,7 +148,7 @@ object ExtendedAdvertisingTankProtocol {
         data[9] = intensity
         data[10] = axisType
         data[11] = secondaryByte
-        data[12] = 0x00
+        data[12] = if (lightsEnabled) 0x01 else 0x00
         data[13] = 0x00
         data[14] = counterByte
         data[15] = 0x00
@@ -244,6 +256,7 @@ object ExtendedAdvertisingTankProtocol {
      */
     fun buildIdleData(
         counter: Int,
+        lightsEnabled: Boolean = false,
         customHeader: ByteArray? = null
     ): ByteArray {
         return buildManufacturerData(
@@ -252,6 +265,7 @@ object ExtendedAdvertisingTankProtocol {
             axisType = AXIS_IDLE,
             secondaryByte = CONSTANT_SECONDARY_BYTE,
             counter = counter,
+            lightsEnabled = lightsEnabled,
             customHeader = customHeader
         )
     }

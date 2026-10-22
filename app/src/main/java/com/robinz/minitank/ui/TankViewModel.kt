@@ -224,6 +224,7 @@ class TankViewModel(
     // ---------------------------------------------------------
     fun toggleBroadcasting() {
         if (bleAdvertiser.isBroadcasting.value) {
+            stopLightsSlowBlink()
             bleAdvertiser.stopBroadcasting()
         } else {
             bleAdvertiser.resetToIdle()
@@ -237,6 +238,7 @@ class TankViewModel(
     }
 
     fun stopBroadcasting() {
+        stopLightsSlowBlink()
         bleAdvertiser.stopBroadcasting()
     }
 
@@ -411,6 +413,7 @@ class TankViewModel(
         }
         val next = !_uiState.value.lightsEnabled
         _uiState.update { it.copy(lightsEnabled = next) }
+        bleAdvertiser.setLights(next)
         bleClient.setLights(next)
         vibrateSubtle()
     }
@@ -436,11 +439,13 @@ class TankViewModel(
                 while (isActive) {
                     // Turn Lights ON
                     _uiState.update { it.copy(lightsEnabled = true) }
+                    bleAdvertiser.setLights(true)
                     bleClient.setLights(true)
                     delay(1000L) // 1 second delay
 
                     // Turn Lights OFF
                     _uiState.update { it.copy(lightsEnabled = false) }
+                    bleAdvertiser.setLights(false)
                     bleClient.setLights(false)
                     delay(1000L) // 1 second delay
                 }
@@ -454,6 +459,7 @@ class TankViewModel(
         lightsBlinkJob?.cancel()
         lightsBlinkJob = null
         _uiState.update { it.copy(lightsBlinkEnabled = false, lightsEnabled = false) }
+        bleAdvertiser.setLights(false)
         bleClient.setLights(false)
     }
 
