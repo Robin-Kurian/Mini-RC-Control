@@ -134,7 +134,7 @@ fun HeaderBar(
                                 .padding(horizontal = 4.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = "SIGNAL",
+                                text = "READY",
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontSize = 8.sp,
                                     fontWeight = FontWeight.ExtraBold,
@@ -146,7 +146,7 @@ fun HeaderBar(
                 }
                 Text(
                     text = if (isBroadcasting) {
-                        "Control signal ON • car not verified"
+                        "Car control active • one-way BLE"
                     } else when (connectionState) {
                         is ConnectionState.Connected -> connectedDeviceName ?: "Tank Connected"
                         is ConnectionState.Connecting -> "Connecting..."

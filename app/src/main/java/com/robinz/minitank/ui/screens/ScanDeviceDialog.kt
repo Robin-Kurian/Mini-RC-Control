@@ -376,7 +376,7 @@ fun ScanDeviceDialog(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (isBroadcasting) {
-                                    "Phone is transmitting • car reception cannot be verified"
+                                    "Car control active • one-way BLE signal"
                                 } else {
                                     "Turn the car on, then start the control signal"
                                 },
