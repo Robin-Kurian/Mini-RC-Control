@@ -1,0 +1,6 @@
+{
+  "summary":  "Revised implementation plan for Robin'z Mini Tank BLE RC controller incorporating hardware PCB insights (DL-HG-TSLRX, headlights, speaker), four control modes (Buttons, Split Sliders, Single Joystick, Gyroscope tilt), Route mode, Diagnostics lab, and adaptive Portrait and Landscape layouts.",
+  "updatedAt":  "2026-10-22T11:19:17.419510092Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
