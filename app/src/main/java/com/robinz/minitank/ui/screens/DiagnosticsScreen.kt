@@ -918,51 +918,75 @@ private fun ExtendedAdvertisingTab(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Preset Buttons
-                    Row(
+                    // Preset Buttons (Confirmed captures)
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Button(
-                            onClick = {
-                                selectedDir = 0x00
-                                selectedIntensity = 0x00
-                                selectedAxis = 0x04
-                                onUpdateBroadcastControls(0x00, 0x00, 0x04)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("IDLE", fontSize = 11.sp, color = SuccessGreen)
+                            Button(
+                                onClick = {
+                                    selectedDir = 0x00
+                                    selectedIntensity = 0x00
+                                    selectedAxis = 0x04
+                                    onUpdateBroadcastControls(0x00, 0x00, 0x04)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("IDLE (00 00 04)", fontSize = 11.sp, color = SuccessGreen)
+                            }
+
+                            Button(
+                                onClick = {
+                                    selectedDir = 0x01
+                                    selectedIntensity = 0x1E // 30% confirmed
+                                    selectedAxis = 0x05
+                                    onUpdateBroadcastControls(0x01, 0x1E.toByte(), 0x05)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("FWD 30% (01 1E 05)", fontSize = 11.sp, color = CyanAccent)
+                            }
                         }
 
-                        Button(
-                            onClick = {
-                                selectedDir = 0x01
-                                selectedIntensity = 0x1E // 30% confirmed
-                                selectedAxis = 0x05
-                                onUpdateBroadcastControls(0x01, 0x1E.toByte(), 0x05)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Text("FWD 30%", fontSize = 11.sp, color = CyanAccent)
-                        }
+                            Button(
+                                onClick = {
+                                    selectedDir = 0x02
+                                    selectedIntensity = 0x1E // 30% confirmed
+                                    selectedAxis = 0x04
+                                    onUpdateBroadcastControls(0x02, 0x1E.toByte(), 0x04)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("REV 30% (02 1E 04)", fontSize = 11.sp, color = WarningAmber)
+                            }
 
-                        Button(
-                            onClick = {
-                                selectedDir = 0x02
-                                selectedIntensity = 0x06
-                                selectedAxis = 0x04
-                                onUpdateBroadcastControls(0x02, 0x06, 0x04)
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
-                            shape = RoundedCornerShape(8.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Text("Test 02", fontSize = 11.sp, color = WarningAmber)
+                            Button(
+                                onClick = {
+                                    selectedDir = 0x04
+                                    selectedIntensity = 0x00 // Confirmed 0x00
+                                    selectedAxis = 0x04
+                                    onUpdateBroadcastControls(0x04, 0x00, 0x04)
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = DarkSurfaceElevated),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("LEFT (04 00 04)", fontSize = 11.sp, color = TextPrimary)
+                            }
                         }
                     }
 

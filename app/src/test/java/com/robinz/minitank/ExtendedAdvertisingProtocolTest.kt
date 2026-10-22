@@ -109,4 +109,62 @@ class ExtendedAdvertisingProtocolTest {
         assertEquals("16 FF 00 00 04 07 03 FD C1 63 35 66 02 06 04 64 00 00 A0 00 00 00 21",
             ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(dataC))
     }
+
+    @Test
+    fun testConfirmedReverseAt30Percent() {
+        // Controlled capture result: REVERSE at displayed 30%
+        // 00 00 04 07 03 FD C1 30 32 63 02 1E 04 64 00 00 01 00 00 00 C9
+        val data01 = ExtendedAdvertisingTankProtocol.buildReverseData(
+            intensityPercent = 30, // 30 decimal = 0x1E
+            counter = 0x01,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 02 1E 04 64 00 00 01 00 00 00 C9",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data01))
+
+        // 00 00 04 07 03 FD C1 30 32 63 02 1E 04 64 00 00 02 00 00 00 CA
+        val data02 = ExtendedAdvertisingTankProtocol.buildReverseData(
+            intensityPercent = 30,
+            counter = 0x02,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 02 1E 04 64 00 00 02 00 00 00 CA",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data02))
+    }
+
+    @Test
+    fun testConfirmedLeft() {
+        // Controlled capture result: LEFT only
+        // 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 48 00 00 00 98
+        val data48 = ExtendedAdvertisingTankProtocol.buildLeftData(
+            counter = 0x48,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 48 00 00 00 98",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data48))
+
+        // 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 49 00 00 00 99
+        val data49 = ExtendedAdvertisingTankProtocol.buildLeftData(
+            counter = 0x49,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 49 00 00 00 99",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data49))
+
+        // 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 4A 00 00 00 9A
+        val data4A = ExtendedAdvertisingTankProtocol.buildLeftData(
+            counter = 0x4A,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 4A 00 00 00 9A",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data4A))
+
+        // 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 4B 00 00 00 9B
+        val data4B = ExtendedAdvertisingTankProtocol.buildLeftData(
+            counter = 0x4B,
+            customHeader = session303263
+        )
+        assertEquals("16 FF 00 00 04 07 03 FD C1 30 32 63 04 00 04 64 00 00 4B 00 00 00 9B",
+            ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(data4B))
+    }
 }

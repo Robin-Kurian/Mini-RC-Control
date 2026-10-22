@@ -85,27 +85,68 @@ class BleTankAdvertiser(
     }
 
     /**
-     * Binds confirmed FORWARD drive motion:
-     * - directionState = 0x01
-     * - intensity = requested power percentage (e.g. 30 -> 0x1E)
-     * - axisType = 0x05
-     * - secondaryByte = 0x64
-     * Reverse and steering will be bound once their controlled captures are labeled.
+     * Binds confirmed drive commands:
+     * - FORWARD: directionState = 0x01, intensity = power % (analog ramp), axisType = 0x05, secondaryByte = 0x64
+     * - REVERSE: directionState = 0x02, intensity = power % (analog ramp), axisType = 0x04, secondaryByte = 0x64
+     * - LEFT:    directionState = 0x04, intensity = 0x00 (button turn), axisType = 0x04, secondaryByte = 0x64
+     * - RIGHT:   directionState = 0x08, intensity = 0x00 (button turn), axisType = 0x04, secondaryByte = 0x64
+     * - IDLE:    directionState = 0x00, intensity = 0x00, axisType = 0x04, secondaryByte = 0x64
      */
-    fun setDriveInput(throttle: Float, speedCapPercent: Int) {
-        if (throttle > 0.05f) {
-            val powerPercent = (throttle * speedCapPercent).toInt().coerceIn(1, 100)
-            currentDirection = ExtendedAdvertisingTankProtocol.STATE_FORWARD
-            currentIntensity = powerPercent.toByte()
-            currentAxis = ExtendedAdvertisingTankProtocol.AXIS_FORWARD
-            isMoving = true
+    fun setDriveInput(
+        throttle: Float,
+        steering: Float = 0f,
+        speedCapPercent: Int
+    ) {
+        when {
+            // Forward (throttle > +0.05f)
+            throttle > 0.05f -> {
+                val powerPercent = (throttle * speedCapPercent).toInt().coerceIn(1, 100)
+                currentDirection = ExtendedAdvertisingTankProtocol.STATE_FORWARD
+                currentIntensity = powerPercent.toByte()
+                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_FORWARD
+                isMoving = true
 
-            // Automatically begin broadcast stream if not running
-            if (!_isBroadcasting.value) {
-                startBroadcasting()
+                if (!_isBroadcasting.value) {
+                    startBroadcasting()
+                }
             }
-        } else {
-            resetToIdle()
+            // Reverse (throttle < -0.05f) - intensity ramps continuously with analog drag
+            throttle < -0.05f -> {
+                val powerPercent = (kotlin.math.abs(throttle) * speedCapPercent).toInt().coerceIn(1, 100)
+                currentDirection = ExtendedAdvertisingTankProtocol.STATE_REVERSE
+                currentIntensity = powerPercent.toByte()
+                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_REVERSE
+                isMoving = true
+
+                if (!_isBroadcasting.value) {
+                    startBroadcasting()
+                }
+            }
+            // Left (steering < -0.15f) - confirmed Left with intensity 0x00
+            steering < -0.15f -> {
+                currentDirection = ExtendedAdvertisingTankProtocol.STATE_LEFT
+                currentIntensity = 0x00
+                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_LEFT
+                isMoving = true
+
+                if (!_isBroadcasting.value) {
+                    startBroadcasting()
+                }
+            }
+            // Right (steering > 0.15f) - confirmed Right with intensity 0x00
+            steering > 0.15f -> {
+                currentDirection = ExtendedAdvertisingTankProtocol.STATE_RIGHT
+                currentIntensity = 0x00
+                currentAxis = ExtendedAdvertisingTankProtocol.AXIS_RIGHT
+                isMoving = true
+
+                if (!_isBroadcasting.value) {
+                    startBroadcasting()
+                }
+            }
+            else -> {
+                resetToIdle()
+            }
         }
     }
 
@@ -125,12 +166,22 @@ class BleTankAdvertiser(
 
     /**
      * Resets control state to verified neutral idle.
+     * Immediately transmits neutral IDLE packet if broadcasting to guarantee instant fail-safe stop.
      */
     fun resetToIdle() {
+        val wasMoving = isMoving
         currentDirection = ExtendedAdvertisingTankProtocol.STATE_IDLE
         currentIntensity = 0x00
         currentAxis = ExtendedAdvertisingTankProtocol.AXIS_IDLE
         isMoving = false
+
+        if (_isBroadcasting.value && wasMoving) {
+            val counter = _rollingCounter.value
+            val payload = ExtendedAdvertisingTankProtocol.buildIdleData(counter)
+            _lastBroadcastHex.value = ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(payload)
+            transmitPacket(payload)
+            _rollingCounter.value = (counter + 1) and 0xFF
+        }
     }
 
     /**
@@ -278,6 +329,7 @@ class BleTankAdvertiser(
             }
             Log.w(TAG, "Legacy advertising error: $msg")
             _lastError.value = msg
+            resetToIdle()
         }
     }
 

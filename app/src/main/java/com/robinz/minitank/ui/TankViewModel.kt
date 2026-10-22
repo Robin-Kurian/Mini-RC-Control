@@ -316,9 +316,10 @@ class TankViewModel(
     }
 
     private fun dispatchDriveToBle(driveState: com.robinz.minitank.controller.DriveState) {
-        // BLE Extended Advertising / Broadcast mode (Confirmed Forward binding)
+        // BLE Extended Advertising / Broadcast mode (Confirmed Forward, Reverse, Left)
         bleAdvertiser.setDriveInput(
             throttle = driveState.rawThrottle,
+            steering = driveState.rawSteering,
             speedCapPercent = driveState.speedCapPercent
         )
 

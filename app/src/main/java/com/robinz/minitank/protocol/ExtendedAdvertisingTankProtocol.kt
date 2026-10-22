@@ -48,9 +48,15 @@ object ExtendedAdvertisingTankProtocol {
     // Confirmed control states
     const val STATE_IDLE: Byte = 0x00
     const val STATE_FORWARD: Byte = 0x01
+    const val STATE_REVERSE: Byte = 0x02
+    const val STATE_LEFT: Byte = 0x04
+    const val STATE_RIGHT: Byte = 0x08
 
     const val AXIS_IDLE: Byte = 0x04
     const val AXIS_FORWARD: Byte = 0x05
+    const val AXIS_REVERSE: Byte = 0x04
+    const val AXIS_LEFT: Byte = 0x04
+    const val AXIS_RIGHT: Byte = 0x04
 
     // Byte 13 (data[11]) confirmed constant 0x64 (100 decimal)
     const val CONSTANT_SECONDARY_BYTE: Byte = 0x64
@@ -158,6 +164,71 @@ object ExtendedAdvertisingTankProtocol {
             directionState = STATE_FORWARD,
             intensity = clampedIntensity,
             axisType = AXIS_FORWARD,
+            secondaryByte = CONSTANT_SECONDARY_BYTE,
+            counter = counter,
+            customHeader = customHeader
+        )
+    }
+
+    /**
+     * Confirmed REVERSE command packet builder:
+     * directionState = 0x02
+     * intensity = requested power percentage (e.g. 30 -> 0x1E, ramps smoothly)
+     * axisType = 0x04
+     * secondaryByte = 0x64
+     */
+    fun buildReverseData(
+        intensityPercent: Int,
+        counter: Int,
+        customHeader: ByteArray? = null
+    ): ByteArray {
+        val clampedIntensity = intensityPercent.coerceIn(1, 100).toByte()
+        return buildManufacturerData(
+            directionState = STATE_REVERSE,
+            intensity = clampedIntensity,
+            axisType = AXIS_REVERSE,
+            secondaryByte = CONSTANT_SECONDARY_BYTE,
+            counter = counter,
+            customHeader = customHeader
+        )
+    }
+
+    /**
+     * Confirmed LEFT command packet builder:
+     * directionState = 0x04
+     * intensity = 0x00 (button-based turn, no separate intensity applied)
+     * axisType = 0x04
+     * secondaryByte = 0x64
+     */
+    fun buildLeftData(
+        counter: Int,
+        customHeader: ByteArray? = null
+    ): ByteArray {
+        return buildManufacturerData(
+            directionState = STATE_LEFT,
+            intensity = 0x00,
+            axisType = AXIS_LEFT,
+            secondaryByte = CONSTANT_SECONDARY_BYTE,
+            counter = counter,
+            customHeader = customHeader
+        )
+    }
+
+    /**
+     * Confirmed RIGHT command packet builder:
+     * directionState = 0x08
+     * intensity = 0x00 (button-based turn, no separate intensity applied)
+     * axisType = 0x04
+     * secondaryByte = 0x64
+     */
+    fun buildRightData(
+        counter: Int,
+        customHeader: ByteArray? = null
+    ): ByteArray {
+        return buildManufacturerData(
+            directionState = STATE_RIGHT,
+            intensity = 0x00,
+            axisType = AXIS_RIGHT,
             secondaryByte = CONSTANT_SECONDARY_BYTE,
             counter = counter,
             customHeader = customHeader
