@@ -152,6 +152,74 @@ private fun LandscapeLayout(
     onRouteClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
+    if (uiState.controlMode == ControlMode.JOYSTICK) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(end = 10.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                HeaderBar(
+                    connectionState = uiState.connectionState,
+                    connectedDeviceName = uiState.connectedDeviceName,
+                    lightsEnabled = uiState.lightsEnabled,
+                    lightsBlinkEnabled = uiState.lightsBlinkEnabled,
+                    soundActive = uiState.soundActive,
+                    isBroadcasting = uiState.isBroadcasting,
+                    onBluetoothClick = onBluetoothClick,
+                    onToggleBroadcast = onToggleBroadcast,
+                    onLightsToggle = onLightsToggle,
+                    onLightsBlinkToggle = onLightsBlinkToggle,
+                    onSoundToggle = onSoundToggle,
+                    onRouteClick = onRouteClick,
+                    onSettingsClick = onSettingsClick,
+                    forceNarrow = true
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                LandscapeDashboard(
+                    uiState = uiState,
+                    onEmergencyStop = onEmergencyStop,
+                    onSpeedCapChanged = onSpeedCapChanged,
+                    onIncrementSpeedCap = onIncrementSpeedCap,
+                    onDecrementSpeedCap = onDecrementSpeedCap,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    ControlModeSelectorRow(
+                        currentMode = uiState.controlMode,
+                        onSelectMode = onSelectControlMode
+                    )
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .padding(start = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                JoystickDriveControl(
+                    onJoystickChanged = onJoystickInput,
+                    onReleased = onDriveReleased
+                )
+            }
+        }
+    } else {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -184,77 +252,86 @@ private fun LandscapeLayout(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Center Column with Speed Cap & STOP button (centered!)
-            when (uiState.controlMode) {
-                ControlMode.SLIDERS -> {
-                    SlidersDriveControl(
-                        onSlidersChanged = onSlidersInput,
-                        onReleased = onDriveReleased,
-                        isLandscape = true,
-                        modifier = Modifier.weight(1f)
+            if (uiState.controlMode == ControlMode.JOYSTICK) {
+                LandscapeDashboard(
+                    uiState = uiState,
+                    onEmergencyStop = onEmergencyStop,
+                    onSpeedCapChanged = onSpeedCapChanged,
+                    onIncrementSpeedCap = onIncrementSpeedCap,
+                    onDecrementSpeedCap = onDecrementSpeedCap,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(end = 8.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(start = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    JoystickDriveControl(
+                        onJoystickChanged = onJoystickInput,
+                        onReleased = onDriveReleased
                     )
                 }
-                ControlMode.BUTTONS -> {
-                    ButtonsDriveControl(
-                        onButtonsChanged = onButtonsInput,
-                        onReleased = onDriveReleased,
-                        isLandscape = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                ControlMode.JOYSTICK -> {
-                    Box(
-                        modifier = Modifier.weight(1f).fillMaxHeight(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        JoystickDriveControl(
-                            onJoystickChanged = onJoystickInput,
-                            onReleased = onDriveReleased
+            } else {
+                when (uiState.controlMode) {
+                    ControlMode.SLIDERS -> {
+                        SlidersDriveControl(
+                            onSlidersChanged = onSlidersInput,
+                            onReleased = onDriveReleased,
+                            isLandscape = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    ControlMode.BUTTONS -> {
+                        ButtonsDriveControl(
+                            onButtonsChanged = onButtonsInput,
+                            onReleased = onDriveReleased,
+                            isLandscape = true,
+                            modifier = Modifier.weight(1f),
+                            centerContent = {
+                                LandscapeDashboard(
+                                    uiState = uiState,
+                                    onEmergencyStop = onEmergencyStop,
+                                    onSpeedCapChanged = onSpeedCapChanged,
+                                    onIncrementSpeedCap = onIncrementSpeedCap,
+                                    onDecrementSpeedCap = onDecrementSpeedCap,
+                                    modifier = Modifier.width(240.dp).fillMaxHeight()
+                                )
+                            }
+                        )
+                    }
+                    ControlMode.JOYSTICK -> Unit
+                    ControlMode.GYRO -> {
+                        GyroDriveControl(
+                            pitch = uiState.gyroPitch,
+                            roll = uiState.gyroRoll,
+                            calibratedPitch = uiState.gyroCalibratedPitch,
+                            calibratedRoll = uiState.gyroCalibratedRoll,
+                            isEngaged = uiState.gyroActive,
+                            onEngageChange = onGyroEngage,
+                            onCalibrateZero = onCalibrateGyroZero,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
-                ControlMode.GYRO -> {
-                    GyroDriveControl(
-                        pitch = uiState.gyroPitch,
-                        roll = uiState.gyroRoll,
-                        calibratedPitch = uiState.gyroCalibratedPitch,
-                        calibratedRoll = uiState.gyroCalibratedRoll,
-                        isEngaged = uiState.gyroActive,
-                        onEngageChange = onGyroEngage,
-                        onCalibrateZero = onCalibrateGyroZero,
-                        modifier = Modifier.weight(1f)
+
+                if (uiState.controlMode != ControlMode.BUTTONS) {
+                    LandscapeDashboard(
+                        uiState = uiState,
+                        onEmergencyStop = onEmergencyStop,
+                        onSpeedCapChanged = onSpeedCapChanged,
+                        onIncrementSpeedCap = onIncrementSpeedCap,
+                        onDecrementSpeedCap = onDecrementSpeedCap,
+                        modifier = Modifier
+                            .width(240.dp)
+                            .fillMaxHeight()
+                            .padding(start = 12.dp)
                     )
                 }
-            }
-
-            // Keep the dashboard on the right so the drive controls can use more height.
-            Column(
-                modifier = Modifier
-                    .width(240.dp)
-                    .fillMaxHeight()
-                    .padding(start = 12.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.SpaceEvenly
-            ) {
-                SpeedCapControl(
-                    speedCapPercent = uiState.speedCapPercent,
-                    onSpeedCapChanged = onSpeedCapChanged,
-                    onIncrement = onIncrementSpeedCap,
-                    onDecrement = onDecrementSpeedCap,
-                    compact = true
-                )
-                TelemetryHud(
-                    rawThrottle = uiState.rawThrottle,
-                    rawSteering = uiState.rawSteering,
-                    cappedThrottle = uiState.cappedThrottle,
-                    speedCapPercent = uiState.speedCapPercent,
-                    isConnected = uiState.connectionState.isConnected,
-                    modifier = Modifier.widthIn(max = 200.dp)
-                )
-                EmergencyStopButton(
-                    onClick = onEmergencyStop,
-                    compact = true
-                )
             }
         }
 
@@ -267,6 +344,43 @@ private fun LandscapeLayout(
             )
         }
 
+    }
+    }
+}
+
+@Composable
+private fun LandscapeDashboard(
+    uiState: TankUiState,
+    onEmergencyStop: () -> Unit,
+    onSpeedCapChanged: (Int) -> Unit,
+    onIncrementSpeedCap: () -> Unit,
+    onDecrementSpeedCap: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceEvenly
+    ) {
+        SpeedCapControl(
+            speedCapPercent = uiState.speedCapPercent,
+            onSpeedCapChanged = onSpeedCapChanged,
+            onIncrement = onIncrementSpeedCap,
+            onDecrement = onDecrementSpeedCap,
+            compact = true
+        )
+        TelemetryHud(
+            rawThrottle = uiState.rawThrottle,
+            rawSteering = uiState.rawSteering,
+            cappedThrottle = uiState.cappedThrottle,
+            speedCapPercent = uiState.speedCapPercent,
+            isConnected = uiState.connectionState.isConnected,
+            modifier = Modifier.widthIn(max = 200.dp)
+        )
+        EmergencyStopButton(
+            onClick = onEmergencyStop,
+            compact = true
+        )
     }
 }
 
@@ -295,7 +409,7 @@ private fun PortraitLayout(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(12.dp),
+            .padding(horizontal = 12.dp, vertical = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -316,9 +430,8 @@ private fun PortraitLayout(
             onSettingsClick = onSettingsClick
         )
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Prominent Centered Speed Cap Display
         SpeedCapControl(
             speedCapPercent = uiState.speedCapPercent,
             onSpeedCapChanged = onSpeedCapChanged,
@@ -326,17 +439,15 @@ private fun PortraitLayout(
             onDecrement = onDecrementSpeedCap
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Mode Selector Chips
         ControlModeSelectorRow(
             currentMode = uiState.controlMode,
             onSelectMode = onSelectControlMode
         )
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Active Control Arena
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -378,9 +489,8 @@ private fun PortraitLayout(
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // Bottom Bar: Telemetry HUD & Prominent Red Emergency STOP
         Row(
             modifier = Modifier
                 .fillMaxWidth()

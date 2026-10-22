@@ -72,6 +72,7 @@ fun HeaderBar(
     onSoundToggle: () -> Unit,
     onRouteClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    forceNarrow: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val statusColor by animateColorAsState(
@@ -85,16 +86,19 @@ fun HeaderBar(
         label = "statusColor"
     )
 
-    val narrow = LocalConfiguration.current.screenWidthDp < 600
+    val narrow = forceNarrow || LocalConfiguration.current.screenWidthDp < 600
     FlowRow(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(DarkSurface)
             .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .padding(
+                horizontal = if (narrow) 12.dp else 8.dp,
+                vertical = if (narrow) 10.dp else 8.dp
+            ),
         horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 8.dp),
         maxItemsInEachRow = if (narrow) 1 else 2
     ) {
         // App Title & Status Indicator
@@ -176,7 +180,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onToggleBroadcast,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (isBroadcasting) CyanAccent.copy(alpha = 0.22f) else DarkSurface)
                     .border(
@@ -211,7 +215,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onBluetoothClick,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .testTag("bluetooth_button")
             ) {
                 Icon(
@@ -230,7 +234,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onLightsToggle,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .testTag("lights_toggle_button")
             ) {
                 Icon(
@@ -245,7 +249,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onLightsBlinkToggle,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .clip(RoundedCornerShape(8.dp))
                     .background(if (lightsBlinkEnabled) WarningAmber.copy(alpha = 0.22f) else DarkSurface)
                     .border(
@@ -281,7 +285,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onSoundToggle,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .testTag("sound_toggle_button")
             ) {
                 Icon(
@@ -296,7 +300,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onRouteClick,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .testTag("route_button")
             ) {
                 Icon(
@@ -311,7 +315,7 @@ fun HeaderBar(
             IconButton(
                 onClick = onSettingsClick,
                 modifier = Modifier
-                    .size(36.dp)
+                    .size(40.dp)
                     .testTag("settings_button")
             ) {
                 Icon(

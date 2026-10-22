@@ -43,7 +43,8 @@ data class TankUiState(
     val controlMode: ControlMode = ControlMode.BUTTONS,
     val hapticFeedbackEnabled: Boolean = true,
     val autoReconnectEnabled: Boolean = true,
-    val lightsEnabled: Boolean = false,
+    // Headlights are on at power-up; the one-way control link cannot query their state.
+    val lightsEnabled: Boolean = true,
     val lightsBlinkEnabled: Boolean = false,
     val soundActive: Boolean = false,
     val engineStarted: Boolean = false,
@@ -352,7 +353,8 @@ class TankViewModel(
             it.copy(
                 rawThrottle = state.rawThrottle,
                 rawSteering = state.rawSteering,
-                cappedThrottle = state.cappedThrottle
+                cappedThrottle = state.cappedThrottle,
+                speedCapPercent = state.speedCapPercent
             )
         }
     }
@@ -367,6 +369,12 @@ class TankViewModel(
             preferencesRepository.updateSpeedCap(clamped)
         }
         syncDriveState()
+        val driveState = driveController.getDriveState()
+        if (!driveState.isZero) {
+            // Apply a changed cap immediately while a control is held; otherwise
+            // the dashboard changes but the car keeps the previous command.
+            dispatchDriveToBle(driveState)
+        }
         vibrateSubtle()
     }
 
@@ -459,7 +467,7 @@ class TankViewModel(
         lightsBlinkJob?.cancel()
         lightsBlinkJob = null
         _uiState.update { it.copy(lightsBlinkEnabled = false, lightsEnabled = false) }
-        bleAdvertiser.setLights(false)
+        bleAdvertiser.setLights(false, startIfIdle = false)
         bleClient.setLights(false)
     }
 

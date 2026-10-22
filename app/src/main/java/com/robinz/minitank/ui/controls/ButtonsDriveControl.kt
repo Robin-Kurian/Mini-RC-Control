@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,6 +38,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robinz.minitank.ui.theme.CyanAccent
@@ -52,7 +54,8 @@ fun ButtonsDriveControl(
     onButtonsChanged: (forward: Boolean, reverse: Boolean, left: Boolean, right: Boolean) -> Unit,
     onReleased: () -> Unit,
     modifier: Modifier = Modifier,
-    isLandscape: Boolean = true
+    isLandscape: Boolean = true,
+    centerContent: (@Composable () -> Unit)? = null
 ) {
     var forwardPressed by remember { mutableStateOf(false) }
     var reversePressed by remember { mutableStateOf(false) }
@@ -71,17 +74,32 @@ fun ButtonsDriveControl(
         }
     }
 
-    if (isLandscape) {
+    BoxWithConstraints(modifier = modifier.fillMaxSize()) {
+        val buttonHeight = if (isLandscape) {
+            (maxHeight * 0.43f).coerceIn(88.dp, 116.dp)
+        } else {
+            (maxHeight * 0.30f).coerceIn(100.dp, 136.dp)
+        }
+        val buttonWidth = if (isLandscape) {
+            (buttonHeight * 1.15f).coerceAtLeast(100.dp)
+        } else {
+            (maxWidth * 0.30f).coerceIn(100.dp, 124.dp)
+        }
+        val throttleButtonWidth = if (isLandscape) buttonWidth + 24.dp else buttonWidth
+        val stackSpacing = if (isLandscape) 18.dp else 14.dp
+        val steeringButtonHeight = buttonHeight * 2 + stackSpacing
+
+        if (isLandscape) {
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = 20.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Group: Forward & Reverse
             Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 TactileControlButton(
@@ -89,6 +107,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowUpward,
                     isPressed = forwardPressed,
                     testTag = "button_forward",
+                    btnWidth = throttleButtonWidth,
+                    btnHeight = buttonHeight,
                     onPressChange = { pressed ->
                         updateState(pressed, reversePressed, leftPressed, rightPressed)
                     }
@@ -98,15 +118,19 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowDownward,
                     isPressed = reversePressed,
                     testTag = "button_reverse",
+                    btnWidth = throttleButtonWidth,
+                    btnHeight = buttonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, pressed, leftPressed, rightPressed)
                     }
                 )
             }
 
+            centerContent?.invoke()
+
             // Right Group: Left & Right
             Row(
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(stackSpacing),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TactileControlButton(
@@ -114,6 +138,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowBack,
                     isPressed = leftPressed,
                     testTag = "button_left",
+                    btnWidth = buttonWidth,
+                    btnHeight = steeringButtonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, reversePressed, pressed, rightPressed)
                     }
@@ -123,6 +149,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowForward,
                     isPressed = rightPressed,
                     testTag = "button_right",
+                    btnWidth = buttonWidth,
+                    btnHeight = steeringButtonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, reversePressed, leftPressed, pressed)
                     }
@@ -132,15 +160,15 @@ fun ButtonsDriveControl(
     } else {
         // Portrait Mode: Ergonomic layout
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Thumb: Throttle Stack
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(stackSpacing),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 TactileControlButton(
@@ -148,8 +176,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowUpward,
                     isPressed = forwardPressed,
                     testTag = "button_forward",
-                    btnWidth = 76.dp,
-                    btnHeight = 68.dp,
+                    btnWidth = buttonWidth,
+                    btnHeight = buttonHeight,
                     onPressChange = { pressed ->
                         updateState(pressed, reversePressed, leftPressed, rightPressed)
                     }
@@ -159,8 +187,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowDownward,
                     isPressed = reversePressed,
                     testTag = "button_reverse",
-                    btnWidth = 76.dp,
-                    btnHeight = 68.dp,
+                    btnWidth = buttonWidth,
+                    btnHeight = buttonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, pressed, leftPressed, rightPressed)
                     }
@@ -169,7 +197,7 @@ fun ButtonsDriveControl(
 
             // Right Thumb: Steering Stack
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TactileControlButton(
@@ -177,8 +205,8 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowBack,
                     isPressed = leftPressed,
                     testTag = "button_left",
-                    btnWidth = 76.dp,
-                    btnHeight = 68.dp,
+                    btnWidth = buttonWidth,
+                    btnHeight = steeringButtonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, reversePressed, pressed, rightPressed)
                     }
@@ -188,14 +216,15 @@ fun ButtonsDriveControl(
                     icon = Icons.Default.ArrowForward,
                     isPressed = rightPressed,
                     testTag = "button_right",
-                    btnWidth = 76.dp,
-                    btnHeight = 68.dp,
+                    btnWidth = buttonWidth,
+                    btnHeight = steeringButtonHeight,
                     onPressChange = { pressed ->
                         updateState(forwardPressed, reversePressed, leftPressed, pressed)
                     }
                 )
             }
         }
+    }
     }
 }
 
@@ -207,19 +236,21 @@ private fun TactileControlButton(
     testTag: String,
     onPressChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
-    btnWidth: androidx.compose.ui.unit.Dp = 88.dp,
-    btnHeight: androidx.compose.ui.unit.Dp = 76.dp
+    btnWidth: Dp = 88.dp,
+    btnHeight: Dp = 76.dp
 ) {
+    val iconSize = (btnHeight * 0.34f).coerceIn(30.dp, 42.dp)
+    val labelSize = if (btnHeight >= 112.dp) 14.sp else 13.sp
     Box(
         modifier = modifier
             .size(width = btnWidth, height = btnHeight)
-            .shadow(if (isPressed) 12.dp else 4.dp, RoundedCornerShape(16.dp), spotColor = CyanAccent)
-            .clip(RoundedCornerShape(16.dp))
+            .shadow(if (isPressed) 12.dp else 5.dp, RoundedCornerShape(20.dp), spotColor = CyanAccent)
+            .clip(RoundedCornerShape(20.dp))
             .background(if (isPressed) CyanAccent else DarkSurfaceElevated)
             .border(
                 width = 2.dp,
                 color = if (isPressed) Color.White else OutlineBorder,
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(20.dp)
             )
             .pointerInput(Unit) {
                 awaitEachGesture {
@@ -243,14 +274,14 @@ private fun TactileControlButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (isPressed) DarkBackground else CyanAccent,
-                modifier = Modifier.size(30.dp)
+                modifier = Modifier.size(iconSize)
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = label,
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    fontSize = 10.sp,
+                    fontSize = labelSize,
                     color = if (isPressed) DarkBackground else TextPrimary
                 )
             )

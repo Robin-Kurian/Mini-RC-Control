@@ -40,8 +40,11 @@ class BleTankAdvertiser(
     companion object {
         private const val TAG = "BleTankAdvertiser"
         private const val IDLE_BROADCAST_INTERVAL_MS = 800L
-        private const val ACTIVE_BROADCAST_INTERVAL_MS = 200L
-        private const val MIN_ACTIVE_COMMAND_MS = 200L
+        // Keep the active control packet on air long enough to be observed by the
+        // receiver (captured controller cadence is roughly 100–131 ms), while
+        // reducing the worst-case wait for a changed input from 200 ms.
+        private const val ACTIVE_BROADCAST_INTERVAL_MS = 150L
+        private const val MIN_ACTIVE_COMMAND_MS = 150L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -73,7 +76,9 @@ class BleTankAdvertiser(
     @Volatile private var currentDirection: Byte = ExtendedAdvertisingTankProtocol.STATE_IDLE
     @Volatile private var currentIntensity: Byte = 0x00
     @Volatile private var currentAxis: Byte = ExtendedAdvertisingTankProtocol.AXIS_IDLE
-    @Volatile private var lightsEnabled: Boolean = false
+    // The car powers up with its headlights on. This protocol is one-way, so we
+    // seed the UI and outgoing packet state from that known startup behavior.
+    @Volatile private var lightsEnabled: Boolean = true
     @Volatile private var isMoving: Boolean = false
     @Volatile private var movementStartedAtMs: Long = 0L
 
@@ -83,6 +88,10 @@ class BleTankAdvertiser(
     private var currentAdvertisingSet: AdvertisingSet? = null
     @Volatile private var extendedStartPending = false
     @Volatile private var legacyAdvertisingActive = false
+    @Volatile private var legacyStartPending = false
+    @Volatile private var legacyRetryPending = false
+    @Volatile private var latestLegacyData: AdvertiseData? = null
+    private val legacyAdvertisingLock = Any()
 
     init {
         // The original app uses legacy/scannable advertising PDUs (HCI event
@@ -145,6 +154,10 @@ class BleTankAdvertiser(
 
         if (!_isBroadcasting.value) {
             startBroadcasting()
+        } else {
+            // Wake the loop instead of waiting out its scheduled packet interval
+            // before advertising the newest steering or throttle.
+            stateChanged.trySend(Unit)
         }
     }
 
@@ -160,13 +173,14 @@ class BleTankAdvertiser(
         currentIntensity = intensity
         currentAxis = axis
         isMoving = direction != ExtendedAdvertisingTankProtocol.STATE_IDLE
+        if (_isBroadcasting.value) stateChanged.trySend(Unit)
     }
 
     /** Updates the verified headlight flag carried by every advertised control packet. */
-    fun setLights(enabled: Boolean) {
+    fun setLights(enabled: Boolean, startIfIdle: Boolean = true) {
         lightsEnabled = enabled
         if (!_isBroadcasting.value) {
-            if (enabled) startBroadcasting()
+            if (startIfIdle) startBroadcasting()
             return
         }
         stateChanged.trySend(Unit)
@@ -287,7 +301,10 @@ class BleTankAdvertiser(
         scope.launch {
             repeat(3) {
                 val counter = _rollingCounter.value
-                val payload = ExtendedAdvertisingTankProtocol.buildIdleData(counter)
+                val payload = ExtendedAdvertisingTankProtocol.buildIdleData(
+                    counter = counter,
+                    lightsEnabled = lightsEnabled
+                )
                 _lastBroadcastHex.value = ExtendedAdvertisingTankProtocol.formatFullAdStructureHex(payload)
                 transmitPacket(payload)
                 _rollingCounter.value = (counter + 1) and 0xFF
@@ -321,15 +338,25 @@ class BleTankAdvertiser(
             .setTimeout(0)
             .build()
 
-        try {
-            if (legacyAdvertisingActive) {
-                adv.stopAdvertising(legacyCallback)
-                legacyAdvertisingActive = false
+        synchronized(legacyAdvertisingLock) {
+            latestLegacyData = advertiseData
+            // startAdvertising is asynchronous. Do not issue another start while
+            // its callback is outstanding; otherwise Android rejects it as
+            // ALREADY_STARTED and the old packet remains on air.
+            if (legacyStartPending || legacyRetryPending) return
+
+            try {
+                if (legacyAdvertisingActive) {
+                    adv.stopAdvertising(legacyCallback)
+                    legacyAdvertisingActive = false
+                }
+                legacyStartPending = true
+                adv.startAdvertising(settings, advertiseData, legacyCallback)
+            } catch (e: Exception) {
+                legacyStartPending = false
+                Log.e(TAG, "Error starting legacy advertising: ${e.message}")
+                _lastError.value = e.message
             }
-            adv.startAdvertising(settings, advertiseData, legacyCallback)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error starting legacy advertising: ${e.message}")
-            _lastError.value = e.message
         }
     }
 
@@ -381,7 +408,10 @@ class BleTankAdvertiser(
 
     private val legacyCallback = object : AdvertiseCallback() {
         override fun onStartSuccess(settingsInEffect: AdvertiseSettings?) {
-            legacyAdvertisingActive = true
+            synchronized(legacyAdvertisingLock) {
+                legacyStartPending = false
+                legacyAdvertisingActive = true
+            }
             _lastError.value = null
         }
 
@@ -396,7 +426,28 @@ class BleTankAdvertiser(
             }
             Log.w(TAG, "Legacy advertising error: $msg")
             _lastError.value = msg
-            legacyAdvertisingActive = false
+            synchronized(legacyAdvertisingLock) {
+                legacyStartPending = false
+                legacyAdvertisingActive = false
+                if (errorCode == ADVERTISE_FAILED_ALREADY_STARTED && !legacyRetryPending) {
+                    // Clear the stale/overlapping legacy set and retry the newest
+                    // payload after Android has processed the stop request.
+                    legacyRetryPending = true
+                    try {
+                        advertiser?.stopAdvertising(this)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Error clearing stale legacy advertising: ${e.message}")
+                    }
+                    scope.launch {
+                        delay(100L)
+                        val retryData = synchronized(legacyAdvertisingLock) {
+                            legacyRetryPending = false
+                            latestLegacyData
+                        }
+                        if (retryData != null) advertiser?.let { transmitLegacyAdvertising(it, retryData) }
+                    }
+                }
+            }
         }
     }
 

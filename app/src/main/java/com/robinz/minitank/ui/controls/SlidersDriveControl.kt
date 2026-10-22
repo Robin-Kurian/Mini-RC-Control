@@ -32,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -57,6 +58,7 @@ import com.robinz.minitank.ui.theme.OutlineBorder
 import com.robinz.minitank.ui.theme.TextMuted
 import com.robinz.minitank.ui.theme.TextPrimary
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
 import kotlin.math.roundToInt
 
 private class SliderState {
@@ -137,8 +139,10 @@ fun SlidersDriveControl(
             )
         }
     } else {
-        BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-            val sliderHeight = maxHeight.coerceAtMost(300.dp)
+        BoxWithConstraints(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            // The parent allocates the remaining screen height to the control arena.
+            // Keep some breathing room around the controls on portrait screens.
+            val sliderHeight = (maxHeight * 0.9f - 12.dp).coerceAtLeast(0.dp)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(sliderHeight),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -206,7 +210,8 @@ fun VerticalThrottleSlider(
     labelsBesideTrack: Boolean = false
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val thumbOffsetAnim = remember { Animatable(0f) }
+    var thumbOffset by remember { mutableFloatStateOf(0f) }
+    var returnAnimationJob by remember { mutableStateOf<Job?>(null) }
     var isDragging by remember { mutableStateOf(false) }
     var trackSize by remember { mutableStateOf(IntSize.Zero) }
     val thumbSize = 56.dp
@@ -238,13 +243,13 @@ fun VerticalThrottleSlider(
         Box(modifier = Modifier.fillMaxSize()) {
             // Forward Label
             Text(
-                text = "ACCEL",
+                text = "THROTTLE",
                 modifier = Modifier.align(
                     if (labelsBesideTrack) Alignment.TopStart else Alignment.TopCenter
                 ),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted
+                    color = if (thumbOffset < -5f) CyanAccent else TextMuted
                 )
             )
 
@@ -261,28 +266,29 @@ fun VerticalThrottleSlider(
                     .pointerInput(maxTravel) {
                         detectDragGestures(
                             onDragStart = {
+                                returnAnimationJob?.cancel()
                                 isDragging = true
                             },
                             onDragEnd = {
                                 isDragging = false
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.animateTo(0f, spring(stiffness = Spring.StiffnessHigh))
-                                    onRelease()
+                                // Send neutral as soon as the finger lifts. The
+                                // visual spring-back must not keep the motor command alive.
+                                onRelease()
+                                returnAnimationJob = coroutineScope.launch {
+                                    Animatable(thumbOffset).animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) { thumbOffset = value }
                                 }
                             },
                             onDragCancel = {
                                 isDragging = false
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.animateTo(0f, spring(stiffness = Spring.StiffnessHigh))
-                                    onRelease()
+                                onRelease()
+                                returnAnimationJob = coroutineScope.launch {
+                                    Animatable(thumbOffset).animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) { thumbOffset = value }
                                 }
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                val next = (thumbOffsetAnim.value + dragAmount.y).coerceIn(-maxTravel, maxTravel)
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.snapTo(next)
-                                }
+                                val next = (thumbOffset + dragAmount.y).coerceIn(-maxTravel, maxTravel)
+                                thumbOffset = next
                                 onDrag(next, maxTravel)
                             }
                         )
@@ -305,7 +311,7 @@ fun VerticalThrottleSlider(
                     modifier = Modifier
                         .size(thumbSize)
                         .align(Alignment.Center)
-                        .offset { IntOffset(0, thumbOffsetAnim.value.roundToInt()) }
+                        .offset { IntOffset(0, thumbOffset.roundToInt()) }
                         .clip(CircleShape)
                         .background(if (isDragging) CyanAccent else DarkSurface)
                         .border(2.dp, CyanAccent, CircleShape),
@@ -313,8 +319,8 @@ fun VerticalThrottleSlider(
                 ) {
                     Text(
                         text = when {
-                            thumbOffsetAnim.value < -10f -> "▲"
-                            thumbOffsetAnim.value > 10f -> "▼"
+                            thumbOffset < -10f -> "▲"
+                            thumbOffset > 10f -> "▼"
                             else -> "—"
                         },
                         style = MaterialTheme.typography.titleMedium.copy(
@@ -333,7 +339,7 @@ fun VerticalThrottleSlider(
                 ),
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
-                    color = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted
+                    color = if (thumbOffset > 5f) CyanAccent else TextMuted
                 )
             )
         }
@@ -347,7 +353,8 @@ fun HorizontalSteeringSlider(
     onRelease: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val thumbOffsetAnim = remember { Animatable(0f) }
+    var thumbOffset by remember { mutableFloatStateOf(0f) }
+    var returnAnimationJob by remember { mutableStateOf<Job?>(null) }
     var isDragging by remember { mutableStateOf(false) }
     var trackSize by remember { mutableStateOf(IntSize.Zero) }
     val thumbSize = 56.dp
@@ -368,7 +375,7 @@ fun HorizontalSteeringSlider(
         ) {
             // Header
             Text(
-                text = "STEERING (DISTANCE RATIO)",
+                text = "STEERING",
                 style = MaterialTheme.typography.labelSmall.copy(
                     fontWeight = FontWeight.Bold,
                     color = if (isDragging) CyanAccent else TextMuted
@@ -387,28 +394,27 @@ fun HorizontalSteeringSlider(
                     .pointerInput(maxTravel) {
                         detectDragGestures(
                             onDragStart = {
+                                returnAnimationJob?.cancel()
                                 isDragging = true
                             },
                             onDragEnd = {
                                 isDragging = false
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.animateTo(0f, spring(stiffness = Spring.StiffnessHigh))
-                                    onRelease()
+                                onRelease()
+                                returnAnimationJob = coroutineScope.launch {
+                                    Animatable(thumbOffset).animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) { thumbOffset = value }
                                 }
                             },
                             onDragCancel = {
                                 isDragging = false
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.animateTo(0f, spring(stiffness = Spring.StiffnessHigh))
-                                    onRelease()
+                                onRelease()
+                                returnAnimationJob = coroutineScope.launch {
+                                    Animatable(thumbOffset).animateTo(0f, spring(stiffness = Spring.StiffnessHigh)) { thumbOffset = value }
                                 }
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                val next = (thumbOffsetAnim.value + dragAmount.x).coerceIn(-maxTravel, maxTravel)
-                                coroutineScope.launch {
-                                    thumbOffsetAnim.snapTo(next)
-                                }
+                                val next = (thumbOffset + dragAmount.x).coerceIn(-maxTravel, maxTravel)
+                                thumbOffset = next
                                 onDrag(next, maxTravel)
                             }
                         )
@@ -431,7 +437,7 @@ fun HorizontalSteeringSlider(
                     modifier = Modifier
                         .size(thumbSize)
                         .align(Alignment.Center)
-                        .offset { IntOffset(thumbOffsetAnim.value.roundToInt(), 0) }
+                        .offset { IntOffset(thumbOffset.roundToInt(), 0) }
                         .clip(CircleShape)
                         .background(if (isDragging) CyanAccent else DarkSurface)
                         .border(2.dp, CyanAccent, CircleShape),
@@ -439,8 +445,8 @@ fun HorizontalSteeringSlider(
                 ) {
                     Text(
                         text = when {
-                            thumbOffsetAnim.value < -10f -> "◀"
-                            thumbOffsetAnim.value > 10f -> "▶"
+                            thumbOffset < -10f -> "◀"
+                            thumbOffset > 10f -> "▶"
                             else -> "|"
                         },
                         style = MaterialTheme.typography.titleMedium.copy(
@@ -461,14 +467,14 @@ fun HorizontalSteeringSlider(
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowLeft,
                         contentDescription = null,
-                        tint = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted,
+                        tint = if (thumbOffset < -5f) CyanAccent else TextMuted,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "LEFT",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (thumbOffsetAnim.value < -5f) CyanAccent else TextMuted
+                            color = if (thumbOffset < -5f) CyanAccent else TextMuted
                         )
                     )
                 }
@@ -478,13 +484,13 @@ fun HorizontalSteeringSlider(
                         text = "RIGHT",
                         style = MaterialTheme.typography.labelSmall.copy(
                             fontWeight = FontWeight.Bold,
-                            color = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted
+                            color = if (thumbOffset > 5f) CyanAccent else TextMuted
                         )
                     )
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowRight,
                         contentDescription = null,
-                        tint = if (thumbOffsetAnim.value > 5f) CyanAccent else TextMuted,
+                        tint = if (thumbOffset > 5f) CyanAccent else TextMuted,
                         modifier = Modifier.size(16.dp)
                     )
                 }
