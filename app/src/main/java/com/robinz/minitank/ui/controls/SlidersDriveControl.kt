@@ -73,69 +73,55 @@ fun SlidersDriveControl(
     onSlidersChanged: (throttleDeltaY: Float, maxThrottleTravel: Float, steeringDeltaX: Float, maxSteeringTravel: Float) -> Unit,
     onReleased: () -> Unit,
     modifier: Modifier = Modifier,
-    isLandscape: Boolean = true
+    isLandscape: Boolean = true,
+    centerContent: (@Composable () -> Unit)? = null
 ) {
     val sliderState = remember { SliderState() }
-
-    val content: @Composable (Modifier, Modifier) -> Unit = { throttleMod, steerMod ->
-        // Left Vertical Slider (Throttle / Brake)
-        VerticalThrottleSlider(
-            modifier = throttleMod,
-            showContainer = false,
-            labelsBesideTrack = isLandscape,
-            onDrag = { dy, maxTravel ->
-                sliderState.throttle = dy
-                sliderState.throttleMaxTravel = maxTravel
-                onSlidersChanged(dy, maxTravel, sliderState.steer, sliderState.steerMaxTravel)
-            },
-            onRelease = {
-                sliderState.throttle = 0f
-                onSlidersChanged(
-                    0f,
-                    sliderState.throttleMaxTravel,
-                    sliderState.steer,
-                    sliderState.steerMaxTravel
-                )
-                if (sliderState.steer == 0f) onReleased()
-            }
-        )
-
-        // Right Horizontal Slider (Left / Right Steering)
-        HorizontalSteeringSlider(
-            modifier = steerMod,
-            onDrag = { dx, maxTravel ->
-                sliderState.steer = dx
-                sliderState.steerMaxTravel = maxTravel
-                onSlidersChanged(sliderState.throttle, sliderState.throttleMaxTravel, dx, maxTravel)
-            },
-            onRelease = {
-                sliderState.steer = 0f
-                onSlidersChanged(
-                    sliderState.throttle,
-                    sliderState.throttleMaxTravel,
-                    0f,
-                    sliderState.steerMaxTravel
-                )
-                if (sliderState.throttle == 0f) onReleased()
-            }
-        )
-    }
 
     if (isLandscape) {
         Row(
             modifier = modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            content(
-                Modifier
+            VerticalThrottleSlider(
+                modifier = Modifier
                     .weight(0.7f)
                     .fillMaxHeight()
                     .padding(start = 16.dp, end = 8.dp),
-                Modifier
+                showContainer = false,
+                labelsBesideTrack = true,
+                onDrag = { dy, maxTravel ->
+                    sliderState.throttle = dy
+                    sliderState.throttleMaxTravel = maxTravel
+                    onSlidersChanged(dy, maxTravel, sliderState.steer, sliderState.steerMaxTravel)
+                },
+                onRelease = {
+                    sliderState.throttle = 0f
+                    onSlidersChanged(0f, sliderState.throttleMaxTravel, sliderState.steer, sliderState.steerMaxTravel)
+                    if (sliderState.steer == 0f) onReleased()
+                }
+            )
+            if (centerContent != null) {
+                Box(
+                    modifier = Modifier.width(340.dp).fillMaxHeight().padding(horizontal = 8.dp),
+                    contentAlignment = Alignment.Center
+                ) { centerContent() }
+            }
+            HorizontalSteeringSlider(
+                modifier = Modifier
                     .weight(1.3f)
                     .fillMaxHeight()
-                    .padding(start = 8.dp, end = 16.dp)
+                    .padding(start = 8.dp, end = 16.dp),
+                onDrag = { dx, maxTravel ->
+                    sliderState.steer = dx
+                    sliderState.steerMaxTravel = maxTravel
+                    onSlidersChanged(sliderState.throttle, sliderState.throttleMaxTravel, dx, maxTravel)
+                },
+                onRelease = {
+                    sliderState.steer = 0f
+                    onSlidersChanged(sliderState.throttle, sliderState.throttleMaxTravel, 0f, sliderState.steerMaxTravel)
+                    if (sliderState.throttle == 0f) onReleased()
+                }
             )
         }
     } else {
@@ -241,18 +227,6 @@ fun VerticalThrottleSlider(
             .coerceAtLeast(1f)
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Forward Label
-            Text(
-                text = "THROTTLE",
-                modifier = Modifier.align(
-                    if (labelsBesideTrack) Alignment.TopStart else Alignment.TopCenter
-                ),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = if (thumbOffset < -5f) CyanAccent else TextMuted
-                )
-            )
-
             // Slider Track Area with Thumb
             Box(
                 modifier = Modifier
@@ -298,6 +272,37 @@ fun VerticalThrottleSlider(
                 // Neutral zero line indicator
                 Canvas(modifier = Modifier.fillMaxSize()) {
                     val midY = size.height / 2f
+                    val chevronHalfWidth = 6.dp.toPx()
+                    val chevronHeight = 6.dp.toPx()
+                    val edgeInset = 18.dp.toPx()
+                    val centerX = size.width / 2f
+                    val strokeWidth = 2.dp.toPx()
+
+                    // Direction hints sit inside the pill, in the open track above and below the thumb.
+                    drawLine(
+                        TextMuted,
+                        Offset(centerX - chevronHalfWidth, edgeInset + chevronHeight),
+                        Offset(centerX, edgeInset),
+                        strokeWidth
+                    )
+                    drawLine(
+                        TextMuted,
+                        Offset(centerX, edgeInset),
+                        Offset(centerX + chevronHalfWidth, edgeInset + chevronHeight),
+                        strokeWidth
+                    )
+                    drawLine(
+                        TextMuted,
+                        Offset(centerX - chevronHalfWidth, size.height - edgeInset - chevronHeight),
+                        Offset(centerX, size.height - edgeInset),
+                        strokeWidth
+                    )
+                    drawLine(
+                        TextMuted,
+                        Offset(centerX, size.height - edgeInset),
+                        Offset(centerX + chevronHalfWidth, size.height - edgeInset - chevronHeight),
+                        strokeWidth
+                    )
                     drawLine(
                         color = OutlineBorder,
                         start = Offset(10f, midY),
@@ -331,17 +336,6 @@ fun VerticalThrottleSlider(
                 }
             }
 
-            // Reverse Label
-            Text(
-                text = "REVERSE",
-                modifier = Modifier.align(
-                    if (labelsBesideTrack) Alignment.BottomStart else Alignment.BottomCenter
-                ),
-                style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = if (thumbOffset > 5f) CyanAccent else TextMuted
-                )
-            )
         }
     }
 }

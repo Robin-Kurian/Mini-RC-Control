@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.robinz.minitank.controller.ControlMode
 import com.robinz.minitank.ui.TankUiState
-import com.robinz.minitank.ui.components.EmergencyStopButton
 import com.robinz.minitank.ui.components.HeaderBar
 import com.robinz.minitank.ui.components.SpeedCapControl
 import com.robinz.minitank.ui.components.TelemetryHud
@@ -174,6 +173,7 @@ private fun LandscapeLayout(
                     soundActive = uiState.soundActive,
                     isBroadcasting = uiState.isBroadcasting,
                     onBluetoothClick = onBluetoothClick,
+                    onEmergencyStop = onEmergencyStop,
                     onToggleBroadcast = onToggleBroadcast,
                     onLightsToggle = onLightsToggle,
                     onLightsBlinkToggle = onLightsBlinkToggle,
@@ -187,7 +187,6 @@ private fun LandscapeLayout(
 
                 LandscapeDashboard(
                     uiState = uiState,
-                    onEmergencyStop = onEmergencyStop,
                     onSpeedCapChanged = onSpeedCapChanged,
                     onIncrementSpeedCap = onIncrementSpeedCap,
                     onDecrementSpeedCap = onDecrementSpeedCap,
@@ -234,6 +233,7 @@ private fun LandscapeLayout(
             soundActive = uiState.soundActive,
             isBroadcasting = uiState.isBroadcasting,
             onBluetoothClick = onBluetoothClick,
+            onEmergencyStop = onEmergencyStop,
             onToggleBroadcast = onToggleBroadcast,
             onLightsToggle = onLightsToggle,
             onLightsBlinkToggle = onLightsBlinkToggle,
@@ -255,7 +255,6 @@ private fun LandscapeLayout(
             if (uiState.controlMode == ControlMode.JOYSTICK) {
                 LandscapeDashboard(
                     uiState = uiState,
-                    onEmergencyStop = onEmergencyStop,
                     onSpeedCapChanged = onSpeedCapChanged,
                     onIncrementSpeedCap = onIncrementSpeedCap,
                     onDecrementSpeedCap = onDecrementSpeedCap,
@@ -283,7 +282,19 @@ private fun LandscapeLayout(
                             onSlidersChanged = onSlidersInput,
                             onReleased = onDriveReleased,
                             isLandscape = true,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            centerContent = {
+                                LandscapeDashboard(
+                                    uiState = uiState,
+                                    onSpeedCapChanged = onSpeedCapChanged,
+                                    onIncrementSpeedCap = onIncrementSpeedCap,
+                                    onDecrementSpeedCap = onDecrementSpeedCap,
+                                    modifier = Modifier.fillMaxHeight(),
+                                    showControlModeSelector = true,
+                                    currentMode = uiState.controlMode,
+                                    onSelectControlMode = onSelectControlMode
+                                )
+                            }
                         )
                     }
                     ControlMode.BUTTONS -> {
@@ -295,7 +306,6 @@ private fun LandscapeLayout(
                             centerContent = {
                                 LandscapeDashboard(
                                     uiState = uiState,
-                                    onEmergencyStop = onEmergencyStop,
                                     onSpeedCapChanged = onSpeedCapChanged,
                                     onIncrementSpeedCap = onIncrementSpeedCap,
                                     onDecrementSpeedCap = onDecrementSpeedCap,
@@ -314,15 +324,26 @@ private fun LandscapeLayout(
                             isEngaged = uiState.gyroActive,
                             onEngageChange = onGyroEngage,
                             onCalibrateZero = onCalibrateGyroZero,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
+                            centerContent = {
+                                LandscapeDashboard(
+                                    uiState = uiState,
+                                    onSpeedCapChanged = onSpeedCapChanged,
+                                    onIncrementSpeedCap = onIncrementSpeedCap,
+                                    onDecrementSpeedCap = onDecrementSpeedCap,
+                                    modifier = Modifier.fillMaxHeight()
+                                )
+                            }
                         )
                     }
                 }
 
-                if (uiState.controlMode != ControlMode.BUTTONS) {
+                if (uiState.controlMode != ControlMode.BUTTONS &&
+                    uiState.controlMode != ControlMode.SLIDERS &&
+                    uiState.controlMode != ControlMode.GYRO
+                ) {
                     LandscapeDashboard(
                         uiState = uiState,
-                        onEmergencyStop = onEmergencyStop,
                         onSpeedCapChanged = onSpeedCapChanged,
                         onIncrementSpeedCap = onIncrementSpeedCap,
                         onDecrementSpeedCap = onDecrementSpeedCap,
@@ -335,13 +356,14 @@ private fun LandscapeLayout(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            ControlModeSelectorRow(
-                currentMode = uiState.controlMode,
-                onSelectMode = onSelectControlMode
-            )
+        if (uiState.controlMode != ControlMode.SLIDERS) {
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                ControlModeSelectorRow(
+                    currentMode = uiState.controlMode,
+                    onSelectMode = onSelectControlMode
+                )
+            }
         }
 
     }
@@ -351,17 +373,25 @@ private fun LandscapeLayout(
 @Composable
 private fun LandscapeDashboard(
     uiState: TankUiState,
-    onEmergencyStop: () -> Unit,
     onSpeedCapChanged: (Int) -> Unit,
     onIncrementSpeedCap: () -> Unit,
     onDecrementSpeedCap: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showControlModeSelector: Boolean = false,
+    currentMode: ControlMode = ControlMode.SLIDERS,
+    onSelectControlMode: (ControlMode) -> Unit = {}
 ) {
     Column(
         modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceEvenly
     ) {
+        if (showControlModeSelector) {
+            ControlModeSelectorRow(
+                currentMode = currentMode,
+                onSelectMode = onSelectControlMode
+            )
+        }
         SpeedCapControl(
             speedCapPercent = uiState.speedCapPercent,
             onSpeedCapChanged = onSpeedCapChanged,
@@ -376,10 +406,6 @@ private fun LandscapeDashboard(
             speedCapPercent = uiState.speedCapPercent,
             isConnected = uiState.connectionState.isConnected,
             modifier = Modifier.widthIn(max = 200.dp)
-        )
-        EmergencyStopButton(
-            onClick = onEmergencyStop,
-            compact = true
         )
     }
 }
@@ -422,6 +448,7 @@ private fun PortraitLayout(
             soundActive = uiState.soundActive,
             isBroadcasting = uiState.isBroadcasting,
             onBluetoothClick = onBluetoothClick,
+            onEmergencyStop = onEmergencyStop,
             onToggleBroadcast = onToggleBroadcast,
             onLightsToggle = onLightsToggle,
             onLightsBlinkToggle = onLightsBlinkToggle,
@@ -491,29 +518,14 @@ private fun PortraitLayout(
 
         Spacer(modifier = Modifier.height(14.dp))
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TelemetryHud(
-                rawThrottle = uiState.rawThrottle,
-                rawSteering = uiState.rawSteering,
-                cappedThrottle = uiState.cappedThrottle,
-                speedCapPercent = uiState.speedCapPercent,
-                isConnected = uiState.connectionState.isConnected,
-                modifier = Modifier.weight(1f)
-            )
-
-            Spacer(modifier = Modifier.width(8.dp))
-
-            EmergencyStopButton(
-                onClick = onEmergencyStop,
-                compact = true
-            )
-        }
+        TelemetryHud(
+            rawThrottle = uiState.rawThrottle,
+            rawSteering = uiState.rawSteering,
+            cappedThrottle = uiState.cappedThrottle,
+            speedCapPercent = uiState.speedCapPercent,
+            isConnected = uiState.connectionState.isConnected,
+            modifier = Modifier.fillMaxWidth()
+        )
     }
 }
 

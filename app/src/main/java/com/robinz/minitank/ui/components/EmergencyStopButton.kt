@@ -44,7 +44,8 @@ import com.robinz.minitank.ui.theme.EmergencyRedDark
 fun EmergencyStopButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false
+    compact: Boolean = false,
+    tiny: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulseAlpha by infiniteTransition.animateFloat(
@@ -66,7 +67,10 @@ fun EmergencyStopButton(
 
     Box(
         modifier = modifier
-            .defaultMinSize(minWidth = if (compact) 100.dp else 140.dp, minHeight = 48.dp)
+            .defaultMinSize(
+                minWidth = if (tiny) 68.dp else if (compact) 100.dp else 140.dp,
+                minHeight = if (tiny) 34.dp else 48.dp
+            )
             .shadow(8.dp, RoundedCornerShape(12.dp), spotColor = EmergencyRed)
             .clip(RoundedCornerShape(12.dp))
             .background(gradient)
@@ -80,7 +84,10 @@ fun EmergencyStopButton(
                 indication = ripple(color = Color.White),
                 onClick = onClick
             )
-            .padding(horizontal = if (compact) 12.dp else 20.dp, vertical = 10.dp)
+            .padding(
+                horizontal = if (tiny) 8.dp else if (compact) 12.dp else 20.dp,
+                vertical = if (tiny) 4.dp else 10.dp
+            )
             .testTag("emergency_stop_button"),
         contentAlignment = Alignment.Center
     ) {
@@ -89,16 +96,16 @@ fun EmergencyStopButton(
                 imageVector = Icons.Default.Warning,
                 contentDescription = "Emergency Stop",
                 tint = Color.White,
-                modifier = Modifier.size(if (compact) 18.dp else 22.dp)
+                modifier = Modifier.size(if (tiny) 14.dp else if (compact) 18.dp else 22.dp)
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(if (tiny) 4.dp else 8.dp))
             Text(
                 text = "STOP",
                 style = MaterialTheme.typography.titleMedium.copy(
                     fontWeight = FontWeight.Black,
                     letterSpacing = 1.5.sp,
                     color = Color.White,
-                    fontSize = if (compact) 14.sp else 16.sp
+                    fontSize = if (tiny) 11.sp else if (compact) 14.sp else 16.sp
                 )
             )
         }

@@ -66,6 +66,7 @@ fun HeaderBar(
     soundActive: Boolean,
     isBroadcasting: Boolean = false,
     onBluetoothClick: () -> Unit,
+    onEmergencyStop: () -> Unit,
     onToggleBroadcast: () -> Unit = {},
     onLightsToggle: () -> Unit,
     onLightsBlinkToggle: () -> Unit,
@@ -101,16 +102,19 @@ fun HeaderBar(
         verticalArrangement = Arrangement.spacedBy(if (narrow) 10.dp else 8.dp),
         maxItemsInEachRow = if (narrow) 1 else 2
     ) {
-        // App Title & Status Indicator
+        // App Title, Connection Status, and Emergency Stop
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .weight(1f, fill = false)
+            modifier = if (narrow) Modifier.fillMaxWidth() else Modifier.weight(1f, fill = false)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable { onBluetoothClick() }
                 .padding(horizontal = 2.dp, vertical = 2.dp)
                 .testTag("connection_pill")
-        ) {
+            ) {
             Box(
                 modifier = Modifier
                     .size(10.dp)
@@ -121,7 +125,7 @@ fun HeaderBar(
             Column {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "Robin'z Mini Tank",
+                        text = "Mini RC Control",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = TextPrimary
@@ -168,6 +172,14 @@ fun HeaderBar(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            }
+            if (narrow) Spacer(modifier = Modifier.weight(1f))
+            EmergencyStopButton(
+                onClick = onEmergencyStop,
+                compact = true,
+                tiny = true,
+                modifier = Modifier.padding(start = if (narrow) 0.dp else 24.dp)
+            )
         }
 
         // Action Buttons: Broadcast, BLE, Headlights, Blink 1s, Sound, Route, Settings

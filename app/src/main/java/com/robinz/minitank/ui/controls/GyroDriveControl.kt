@@ -60,7 +60,8 @@ fun GyroDriveControl(
     isEngaged: Boolean,
     onEngageChange: (Boolean) -> Unit,
     onCalibrateZero: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    centerContent: (@Composable () -> Unit)? = null
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -68,7 +69,81 @@ fun GyroDriveControl(
     val relPitch = (pitch - calibratedPitch).coerceIn(-30f, 30f)
     val relRoll = (roll - calibratedRoll).coerceIn(-30f, 30f)
 
-    if (isLandscape) {
+    if (isLandscape && centerContent != null) {
+        Row(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            HorizonBubbleBox(
+                relPitch = relPitch,
+                relRoll = relRoll,
+                isEngaged = isEngaged,
+                boxSize = 250.dp
+            )
+
+            Box(
+                modifier = Modifier.width(240.dp).fillMaxHeight(),
+                contentAlignment = Alignment.Center
+            ) {
+                centerContent()
+            }
+
+            Column(
+                modifier = Modifier.width(220.dp).fillMaxHeight().padding(vertical = 8.dp),
+                verticalArrangement = Arrangement.SpaceEvenly,
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "PITCH: %+.1f°".format(relPitch),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                    Text(
+                        text = "ROLL: %+.1f°".format(relRoll),
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+
+                Button(
+                    onClick = onCalibrateZero,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DarkSurface,
+                        contentColor = CyanAccent
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(54.dp)
+                        .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
+                        .testTag("calibrate_zero_button")
+                ) {
+                    Icon(imageVector = Icons.Default.Adjust, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(text = "ZERO LEVEL", fontSize = 12.sp)
+                }
+
+                DeadmanTouchPad(
+                    isEngaged = isEngaged,
+                    onEngageChange = onEngageChange,
+                    modifier = Modifier.fillMaxWidth().height(64.dp)
+                )
+            }
+        }
+    } else if (isLandscape) {
         // Landscape Responsive Layout: Artificial Horizon on Left, Readouts & Controls on Right
         Row(
             modifier = modifier
@@ -239,10 +314,11 @@ private fun HorizonBubbleBox(
     relPitch: Float,
     relRoll: Float,
     isEngaged: Boolean,
-    boxSize: androidx.compose.ui.unit.Dp
+    boxSize: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = Modifier
+        modifier = modifier
             .size(boxSize)
             .clip(CircleShape)
             .background(DarkSurfaceElevated)

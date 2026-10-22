@@ -39,7 +39,7 @@ fun TelemetryHud(
 ) {
     Row(
         modifier = modifier
-            .height(48.dp)
+            .height(52.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(DarkSurface)
             .border(1.dp, OutlineBorder, RoundedCornerShape(12.dp))
