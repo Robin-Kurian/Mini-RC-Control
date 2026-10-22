@@ -11,7 +11,7 @@ import com.robinz.minitank.ui.screens.ScanDeviceDialog
 import com.robinz.minitank.controller.ControlMode
 import com.robinz.minitank.ui.TankUiState
 import com.robinz.minitank.ui.screens.MainControllerScreen
-import com.robinz.minitank.ui.theme.RobinMiniTankTheme
+import com.robinz.minitank.ui.theme.MiniRCControlTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -45,7 +45,7 @@ class RobolectricUiTest {
             DiscoveredDevice("Tank $it", "AA:BB:CC:DD:EE:%02X".format(it), -60, true)
         } + DiscoveredDevice(null, "11:22:33:44:55:66", -80, false)
         composeTestRule.setContent {
-            RobinMiniTankTheme {
+            MiniRCControlTheme {
                 ScanDeviceDialog(
                     scannedDevices = devices,
                     isScanning = true,
@@ -70,7 +70,7 @@ class RobolectricUiTest {
         )
 
         composeTestRule.setContent {
-            RobinMiniTankTheme {
+            MiniRCControlTheme {
                 MainControllerScreen(
                     uiState = uiState,
                     onButtonsInput = { _, _, _, _ -> },
@@ -94,7 +94,7 @@ class RobolectricUiTest {
         }
 
         // Assert Title is displayed
-        composeTestRule.onNodeWithText("Robin'z Mini Tank").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Mini RC Control").assertIsDisplayed()
 
         // Assert Prominent Centered Speed Cap Display shows "20%"
         composeTestRule.onNodeWithTag("speed_cap_display").assertIsDisplayed()
@@ -116,7 +116,7 @@ class RobolectricUiTest {
         )
 
         composeTestRule.setContent {
-            RobinMiniTankTheme {
+            MiniRCControlTheme {
                 MainControllerScreen(
                     uiState = uiState,
                     onButtonsInput = { _, _, _, _ -> },
@@ -152,7 +152,7 @@ class RobolectricUiTest {
         )
 
         composeTestRule.setContent {
-            RobinMiniTankTheme {
+            MiniRCControlTheme {
                 MainControllerScreen(
                     uiState = uiState,
                     onButtonsInput = { _, _, _, _ -> },

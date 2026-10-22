@@ -23,7 +23,7 @@ private val DarkColorScheme = darkColorScheme(
 )
 
 @Composable
-fun RobinMiniTankTheme(content: @Composable () -> Unit) {
+fun MiniRCControlTheme(content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = DarkColorScheme,
         typography = Typography,

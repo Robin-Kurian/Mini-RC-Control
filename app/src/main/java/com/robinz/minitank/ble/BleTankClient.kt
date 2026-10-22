@@ -18,6 +18,7 @@ import android.os.Build
 import android.os.ParcelUuid
 import android.util.Log
 import com.robinz.minitank.protocol.TankProtocol
+import com.robinz.minitank.protocol.ExtendedAdvertisingTankProtocol
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -117,7 +118,7 @@ class BleTankClient(
 
     fun exportLogsText(): String {
         val sb = StringBuilder()
-        sb.append("Robin'z Mini Tank BLE Diagnostic Log\n")
+        sb.append("Mini RC Control BLE Diagnostic Log\n")
         sb.append("Device: ${activeDeviceName ?: "Unknown"} (${activeDeviceAddress ?: "None"})\n")
         sb.append("Generated: ${java.util.Date()}\n")
         sb.append("--------------------------------------------------\n")
@@ -131,6 +132,8 @@ class BleTankClient(
     // Scanning
     // ---------------------------------------------------------
     private val scanCallback = object : ScanCallback() {
+        private val lastObservedLightState = mutableMapOf<String, Byte>()
+
         override fun onScanResult(callbackType: Int, result: ScanResult?) {
             result ?: return
             val device = result.device ?: return
@@ -140,6 +143,33 @@ class BleTankClient(
 
             val serviceUuids = result.scanRecord?.serviceUuids.orEmpty().map { it.uuid }
             val hasFff0 = serviceUuids.contains(BleConstants.SERVICE_TANK)
+
+            // Capture only this tank protocol's advertisements, and only when its light bit
+            // changes. This keeps diagnostics useful without logging unrelated nearby devices
+            // or the rapidly changing drive/counter bytes.
+            val manufacturerData = result.scanRecord
+                ?.getManufacturerSpecificData(ExtendedAdvertisingTankProtocol.COMPANY_ID)
+            val header = ExtendedAdvertisingTankProtocol.BASE_HEADER
+            if (manufacturerData != null && manufacturerData.size > 12 &&
+                header.indices.all { index ->
+                    val actual = manufacturerData[index].toInt() and 0xFF
+                    val expected = header[index].toInt() and 0xFF
+                    actual == expected
+                }) {
+                val lightState = manufacturerData[12]
+                val previousState = lastObservedLightState.put(address, lightState)
+                if (previousState != lightState) {
+                    val payloadHex = manufacturerData.joinToString(" ") {
+                        "%02X".format(it.toInt() and 0xFF)
+                    }
+                    log(
+                        LogType.INFO,
+                        null,
+                        payloadHex,
+                        "Observed tank advertisement headlight=${lightState.toInt() != 0}"
+                    )
+                }
+            }
 
             val current = _scannedDevices.value.toMutableList()
             val existingIndex = current.indexOfFirst { it.address.equals(address, ignoreCase = true) }

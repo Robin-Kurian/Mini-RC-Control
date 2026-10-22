@@ -152,7 +152,7 @@ fun DiagnosticsScreen(
                             val text = onExportLogs()
                             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                 type = "text/plain"
-                                putExtra(Intent.EXTRA_SUBJECT, "Robin'z Mini Tank Diagnostic Log")
+                                putExtra(Intent.EXTRA_SUBJECT, "Mini RC Control Diagnostic Log")
                                 putExtra(Intent.EXTRA_TEXT, text)
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Export Diagnostic Log"))

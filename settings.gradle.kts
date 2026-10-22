@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Robin\'z Mini Tank"
+rootProject.name = "Mini RC Control"
 
 include(":app")

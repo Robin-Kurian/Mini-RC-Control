@@ -25,7 +25,7 @@ import com.robinz.minitank.ui.screens.MainControllerScreen
 import com.robinz.minitank.ui.screens.RouteScreen
 import com.robinz.minitank.ui.screens.ScanDeviceDialog
 import com.robinz.minitank.ui.screens.SettingsDialog
-import com.robinz.minitank.ui.theme.RobinMiniTankTheme
+import com.robinz.minitank.ui.theme.MiniRCControlTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            RobinMiniTankTheme {
+            MiniRCControlTheme {
                 TankApp(viewModel)
             }
         }

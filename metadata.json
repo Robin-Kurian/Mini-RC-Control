@@ -1,5 +1,5 @@
 {
-  "name": "Robin'z Mini Tank",
+  "name": "Mini RC Control",
   "description": "Native Bluetooth Low Energy RC controller for miniature tanks with fail-safe drive mechanics, multi-modal controls, and protocol diagnostics.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

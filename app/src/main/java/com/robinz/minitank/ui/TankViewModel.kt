@@ -422,7 +422,6 @@ class TankViewModel(
         val next = !_uiState.value.lightsEnabled
         _uiState.update { it.copy(lightsEnabled = next) }
         bleAdvertiser.setLights(next)
-        bleClient.setLights(next)
         vibrateSubtle()
     }
 
@@ -448,13 +447,11 @@ class TankViewModel(
                     // Turn Lights ON
                     _uiState.update { it.copy(lightsEnabled = true) }
                     bleAdvertiser.setLights(true)
-                    bleClient.setLights(true)
                     delay(1000L) // 1 second delay
 
                     // Turn Lights OFF
                     _uiState.update { it.copy(lightsEnabled = false) }
                     bleAdvertiser.setLights(false)
-                    bleClient.setLights(false)
                     delay(1000L) // 1 second delay
                 }
             } catch (e: Exception) {
@@ -468,7 +465,6 @@ class TankViewModel(
         lightsBlinkJob = null
         _uiState.update { it.copy(lightsBlinkEnabled = false, lightsEnabled = false) }
         bleAdvertiser.setLights(false, startIfIdle = false)
-        bleClient.setLights(false)
     }
 
     fun toggleSound() {

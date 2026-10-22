@@ -131,7 +131,7 @@ object ExtendedAdvertisingTankProtocol {
         customHeader: ByteArray? = null
     ): ByteArray {
         val counterByte = (counter and 0xFF).toByte()
-        val header = customHeader ?: getHeader()
+        val header = (customHeader ?: getHeader()).copyOf()
         val checksum = calculateChecksum(
             directionState = directionState,
             intensity = intensity,

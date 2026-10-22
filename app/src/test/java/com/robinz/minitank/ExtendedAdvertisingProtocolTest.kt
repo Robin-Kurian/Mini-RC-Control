@@ -18,7 +18,7 @@ class ExtendedAdvertisingProtocolTest {
 
     @Test
     fun testConfirmedHeadlightsOn() {
-        // Captured light-on payload: byte 12 is 0x01 and participates in the checksum.
+        // Captured original-app packet: payload byte 12 is 0x01 when the headlights are on.
         val data = ExtendedAdvertisingTankProtocol.buildIdleData(
             counter = 0xBF,
             lightsEnabled = true,
