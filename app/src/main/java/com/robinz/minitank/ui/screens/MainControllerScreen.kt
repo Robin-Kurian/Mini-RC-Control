@@ -22,6 +22,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.key
+import com.robinz.minitank.ui.controls.controlSideArrangement
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +77,11 @@ fun MainControllerScreen(
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var controlsSwapped by rememberSaveable { mutableStateOf(false) }
+    val onSwapControls = {
+        onDriveReleased()
+        controlsSwapped = !controlsSwapped
+    }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
@@ -81,57 +92,65 @@ fun MainControllerScreen(
             .safeDrawingPadding()
             .testTag("main_controller_screen")
     ) {
-        if (isLandscape) {
-            LandscapeLayout(
-                uiState = uiState,
-                onButtonsInput = onButtonsInput,
-                onSlidersInput = onSlidersInput,
-                onJoystickInput = onJoystickInput,
-                onGyroEngage = onGyroEngage,
-                onCalibrateGyroZero = onCalibrateGyroZero,
-                onDriveReleased = onDriveReleased,
-                onEmergencyStop = onEmergencyStop,
-                onSpeedCapChanged = onSpeedCapChanged,
-                onIncrementSpeedCap = onIncrementSpeedCap,
-                onDecrementSpeedCap = onDecrementSpeedCap,
-                onSelectControlMode = onSelectControlMode,
-                onBluetoothClick = onBluetoothClick,
-                onToggleBroadcast = onToggleBroadcast,
-                onLightsToggle = onLightsToggle,
-                onLightsBlinkToggle = onLightsBlinkToggle,
-                onSoundToggle = onSoundToggle,
-                onRouteClick = onRouteClick,
-                onSettingsClick = onSettingsClick
-            )
-        } else {
-            PortraitLayout(
-                uiState = uiState,
-                onButtonsInput = onButtonsInput,
-                onSlidersInput = onSlidersInput,
-                onJoystickInput = onJoystickInput,
-                onGyroEngage = onGyroEngage,
-                onCalibrateGyroZero = onCalibrateGyroZero,
-                onDriveReleased = onDriveReleased,
-                onEmergencyStop = onEmergencyStop,
-                onSpeedCapChanged = onSpeedCapChanged,
-                onIncrementSpeedCap = onIncrementSpeedCap,
-                onDecrementSpeedCap = onDecrementSpeedCap,
-                onSelectControlMode = onSelectControlMode,
-                onBluetoothClick = onBluetoothClick,
-                onToggleBroadcast = onToggleBroadcast,
-                onLightsToggle = onLightsToggle,
-                onLightsBlinkToggle = onLightsBlinkToggle,
-                onSoundToggle = onSoundToggle,
-                onRouteClick = onRouteClick,
-                onSettingsClick = onSettingsClick
-            )
-        }
+        key(controlsSwapped) {
+            if (isLandscape) {
+                LandscapeLayout(
+                    uiState = uiState,
+                    controlsSwapped = controlsSwapped,
+                    onSwapControls = onSwapControls,
+                    onButtonsInput = onButtonsInput,
+                    onSlidersInput = onSlidersInput,
+                    onJoystickInput = onJoystickInput,
+                    onGyroEngage = onGyroEngage,
+                    onCalibrateGyroZero = onCalibrateGyroZero,
+                    onDriveReleased = onDriveReleased,
+                    onEmergencyStop = onEmergencyStop,
+                    onSpeedCapChanged = onSpeedCapChanged,
+                    onIncrementSpeedCap = onIncrementSpeedCap,
+                    onDecrementSpeedCap = onDecrementSpeedCap,
+                    onSelectControlMode = onSelectControlMode,
+                    onBluetoothClick = onBluetoothClick,
+                    onToggleBroadcast = onToggleBroadcast,
+                    onLightsToggle = onLightsToggle,
+                    onLightsBlinkToggle = onLightsBlinkToggle,
+                    onSoundToggle = onSoundToggle,
+                    onRouteClick = onRouteClick,
+                    onSettingsClick = onSettingsClick
+                )
+            } else {
+                PortraitLayout(
+                    uiState = uiState,
+                    controlsSwapped = controlsSwapped,
+                    onSwapControls = onSwapControls,
+                    onButtonsInput = onButtonsInput,
+                    onSlidersInput = onSlidersInput,
+                    onJoystickInput = onJoystickInput,
+                    onGyroEngage = onGyroEngage,
+                    onCalibrateGyroZero = onCalibrateGyroZero,
+                    onDriveReleased = onDriveReleased,
+                    onEmergencyStop = onEmergencyStop,
+                    onSpeedCapChanged = onSpeedCapChanged,
+                    onIncrementSpeedCap = onIncrementSpeedCap,
+                    onDecrementSpeedCap = onDecrementSpeedCap,
+                    onSelectControlMode = onSelectControlMode,
+                    onBluetoothClick = onBluetoothClick,
+                    onToggleBroadcast = onToggleBroadcast,
+                    onLightsToggle = onLightsToggle,
+                    onLightsBlinkToggle = onLightsBlinkToggle,
+                    onSoundToggle = onSoundToggle,
+                    onRouteClick = onRouteClick,
+                    onSettingsClick = onSettingsClick
+                )
+            }
+    }
     }
 }
 
 @Composable
 private fun LandscapeLayout(
     uiState: TankUiState,
+    controlsSwapped: Boolean,
+    onSwapControls: () -> Unit,
     onButtonsInput: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onSlidersInput: (Float, Float, Float, Float) -> Unit,
     onJoystickInput: (Float, Float, Float) -> Unit,
@@ -156,6 +175,7 @@ private fun LandscapeLayout(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 14.dp, vertical = 6.dp),
+            horizontalArrangement = controlSideArrangement(!controlsSwapped),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
@@ -174,6 +194,8 @@ private fun LandscapeLayout(
                     isBroadcasting = uiState.isBroadcasting,
                     onBluetoothClick = onBluetoothClick,
                     onEmergencyStop = onEmergencyStop,
+                    controlsSwapped = controlsSwapped,
+                    onSwapControls = onSwapControls,
                     onToggleBroadcast = onToggleBroadcast,
                     onLightsToggle = onLightsToggle,
                     onLightsBlinkToggle = onLightsBlinkToggle,
@@ -234,6 +256,8 @@ private fun LandscapeLayout(
             isBroadcasting = uiState.isBroadcasting,
             onBluetoothClick = onBluetoothClick,
             onEmergencyStop = onEmergencyStop,
+                    controlsSwapped = controlsSwapped,
+                    onSwapControls = onSwapControls,
             onToggleBroadcast = onToggleBroadcast,
             onLightsToggle = onLightsToggle,
             onLightsBlinkToggle = onLightsBlinkToggle,
@@ -280,6 +304,7 @@ private fun LandscapeLayout(
                     ControlMode.SLIDERS -> {
                         SlidersDriveControl(
                             onSlidersChanged = onSlidersInput,
+                            controlsSwapped = controlsSwapped,
                             onReleased = onDriveReleased,
                             isLandscape = true,
                             modifier = Modifier.weight(1f),
@@ -300,6 +325,7 @@ private fun LandscapeLayout(
                     ControlMode.BUTTONS -> {
                         ButtonsDriveControl(
                             onButtonsChanged = onButtonsInput,
+                            controlsSwapped = controlsSwapped,
                             onReleased = onDriveReleased,
                             isLandscape = true,
                             modifier = Modifier.weight(1f),
@@ -413,6 +439,8 @@ private fun LandscapeDashboard(
 @Composable
 private fun PortraitLayout(
     uiState: TankUiState,
+    controlsSwapped: Boolean,
+    onSwapControls: () -> Unit,
     onButtonsInput: (Boolean, Boolean, Boolean, Boolean) -> Unit,
     onSlidersInput: (Float, Float, Float, Float) -> Unit,
     onJoystickInput: (Float, Float, Float) -> Unit,
@@ -449,6 +477,8 @@ private fun PortraitLayout(
             isBroadcasting = uiState.isBroadcasting,
             onBluetoothClick = onBluetoothClick,
             onEmergencyStop = onEmergencyStop,
+                    controlsSwapped = controlsSwapped,
+                    onSwapControls = onSwapControls,
             onToggleBroadcast = onToggleBroadcast,
             onLightsToggle = onLightsToggle,
             onLightsBlinkToggle = onLightsBlinkToggle,
@@ -485,6 +515,7 @@ private fun PortraitLayout(
                 ControlMode.SLIDERS -> {
                     SlidersDriveControl(
                         onSlidersChanged = onSlidersInput,
+                            controlsSwapped = controlsSwapped,
                         onReleased = onDriveReleased,
                         isLandscape = false
                     )
@@ -492,6 +523,7 @@ private fun PortraitLayout(
                 ControlMode.BUTTONS -> {
                     ButtonsDriveControl(
                         onButtonsChanged = onButtonsInput,
+                            controlsSwapped = controlsSwapped,
                         onReleased = onDriveReleased,
                         isLandscape = false
                     )

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.BluetoothConnected
 import androidx.compose.material.icons.filled.BluetoothDisabled
 import androidx.compose.material.icons.filled.Highlight
 import androidx.compose.material.icons.filled.Route
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Highlight
 import androidx.compose.material3.Icon
@@ -73,6 +74,8 @@ fun HeaderBar(
     onSoundToggle: () -> Unit,
     onRouteClick: () -> Unit,
     onSettingsClick: () -> Unit,
+    controlsSwapped: Boolean = false,
+    onSwapControls: () -> Unit = {},
     forceNarrow: Boolean = false,
     modifier: Modifier = Modifier
 ) {
@@ -174,11 +177,23 @@ fun HeaderBar(
             }
             }
             if (narrow) Spacer(modifier = Modifier.weight(1f))
+            IconButton(
+                onClick = onSwapControls,
+                modifier = Modifier
+                    .size(48.dp)
+                    .testTag("swap_controls_button")
+            ) {
+                Icon(
+                    imageVector = Icons.Default.SwapHoriz,
+                    contentDescription = if (controlsSwapped) "Move throttle to left" else "Move throttle to right",
+                    tint = if (controlsSwapped) CyanAccent else TextMuted
+                )
+            }
             EmergencyStopButton(
                 onClick = onEmergencyStop,
                 compact = true,
                 tiny = true,
-                modifier = Modifier.padding(start = if (narrow) 0.dp else 24.dp)
+                modifier = Modifier.padding(start = 4.dp)
             )
         }
 

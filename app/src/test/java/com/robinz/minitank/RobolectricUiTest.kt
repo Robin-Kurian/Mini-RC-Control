@@ -108,6 +108,53 @@ class RobolectricUiTest {
     }
 
     @Test
+    @Config(sdk = [34], qualifiers = "w1000dp-h480dp-land")
+    fun controlSidesSwitchAcrossModes() {
+        val mode = androidx.compose.runtime.mutableStateOf(ControlMode.SLIDERS)
+        var released = 0
+        composeTestRule.setContent {
+            MiniRCControlTheme {
+                MainControllerScreen(
+                    uiState = TankUiState(controlMode = mode.value),
+                    onButtonsInput = { _, _, _, _ -> },
+                    onSlidersInput = { _, _, _, _ -> },
+                    onJoystickInput = { _, _, _ -> },
+                    onGyroEngage = {},
+                    onCalibrateGyroZero = {},
+                    onDriveReleased = { released++ },
+                    onEmergencyStop = {},
+                    onSpeedCapChanged = {},
+                    onIncrementSpeedCap = {},
+                    onDecrementSpeedCap = {},
+                    onSelectControlMode = { mode.value = it },
+                    onBluetoothClick = {},
+                    onLightsToggle = {},
+                    onSoundToggle = {},
+                    onRouteClick = {},
+                    onSettingsClick = {}
+                )
+            }
+        }
+
+        fun x(tag: String) = composeTestRule.onNodeWithTag(tag)
+            .fetchSemanticsNode().boundsInRoot.center.x
+
+        assertTrue(x("vertical_throttle_slider") < x("horizontal_steering_slider"))
+        composeTestRule.onNodeWithTag("swap_controls_button").performClick()
+        assertTrue(x("vertical_throttle_slider") > x("horizontal_steering_slider"))
+        assertEquals(1, released)
+        composeTestRule.runOnIdle { mode.value = ControlMode.BUTTONS }
+        assertTrue(x("button_forward") > x("button_left"))
+        assertTrue(x("button_left") < x("button_right"))
+        composeTestRule.onNodeWithTag("swap_controls_button").performClick()
+        assertTrue(x("button_forward") < x("button_left"))
+        composeTestRule.runOnIdle { mode.value = ControlMode.JOYSTICK }
+        val leftX = x("joystick_control_arena")
+        composeTestRule.onNodeWithTag("swap_controls_button").performClick()
+        assertTrue(x("joystick_control_arena") > leftX)
+    }
+
+    @Test
     fun testModeSwitchingInteraction() {
         var selectedMode: ControlMode? = null
         val uiState = TankUiState(

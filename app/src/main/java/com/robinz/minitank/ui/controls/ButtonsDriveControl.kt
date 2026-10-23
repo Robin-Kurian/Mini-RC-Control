@@ -55,6 +55,7 @@ fun ButtonsDriveControl(
     onReleased: () -> Unit,
     modifier: Modifier = Modifier,
     isLandscape: Boolean = true,
+    controlsSwapped: Boolean = false,
     centerContent: (@Composable () -> Unit)? = null
 ) {
     var forwardPressed by remember { mutableStateOf(false) }
@@ -94,7 +95,7 @@ fun ButtonsDriveControl(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 20.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = controlSideArrangement(controlsSwapped, Arrangement.SpaceBetween),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Group: Forward & Reverse
@@ -163,7 +164,7 @@ fun ButtonsDriveControl(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 8.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = controlSideArrangement(controlsSwapped, Arrangement.SpaceBetween),
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Left Thumb: Throttle Stack

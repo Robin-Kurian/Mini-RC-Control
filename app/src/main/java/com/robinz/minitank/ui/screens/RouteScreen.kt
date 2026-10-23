@@ -47,6 +47,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -74,8 +76,68 @@ import com.robinz.minitank.ui.theme.TextMuted
 import com.robinz.minitank.ui.theme.TextPrimary
 import com.robinz.minitank.ui.theme.WarningAmber
 import kotlin.math.hypot
+import kotlin.math.atan2
+import kotlin.math.abs
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 data class RoutePoint(val x: Float, val y: Float)
+
+private val RouteStartGreen = Color(0xFF10B981)
+
+private fun prepareRoute(points: List<RoutePoint>): List<RoutePoint> {
+    if (points.size < 3) return points
+
+    val smoothed = points.mapIndexed { index, point ->
+        if (index == 0 || index == points.lastIndex) point
+        else {
+            val start = (index - 2).coerceAtLeast(0)
+            val end = (index + 2).coerceAtMost(points.lastIndex)
+            val window = points.subList(start, end + 1)
+            RoutePoint(window.map { it.x }.average().toFloat(), window.map { it.y }.average().toFloat())
+        }
+    }
+
+    // Drawing records points about every 16 px. Collapse hand jitter and short samples
+    // into useful segments while retaining corners and curved sections.
+    val simplified = mutableListOf(smoothed.first())
+    var distanceSinceLast = 0f
+    for (index in 1 until smoothed.lastIndex) {
+        distanceSinceLast += hypot(smoothed[index].x - smoothed[index - 1].x, smoothed[index].y - smoothed[index - 1].y)
+        val before = smoothed[index - 1]
+        val current = smoothed[index]
+        val after = smoothed[index + 1]
+        val firstX = current.x - before.x
+        val firstY = current.y - before.y
+        val secondX = after.x - current.x
+        val secondY = after.y - current.y
+        val angle = atan2(firstX * secondY - firstY * secondX, firstX * secondX + firstY * secondY)
+        if (distanceSinceLast >= 32f || abs(angle) >= 0.35f) {
+            simplified += current
+            distanceSinceLast = 0f
+        }
+    }
+    simplified += smoothed.last()
+    return simplified
+}
+
+private fun routeSteering(points: List<RoutePoint>, segmentIndex: Int): Float {
+    if (points.size < 3) return 0f
+    val from = if (segmentIndex < points.lastIndex) points[segmentIndex - 1] else points[segmentIndex - 2]
+    val pivot = if (segmentIndex < points.lastIndex) points[segmentIndex] else points[segmentIndex - 1]
+    val to = if (segmentIndex < points.lastIndex) points[segmentIndex + 1] else points[segmentIndex]
+    val firstX = pivot.x - from.x
+    val firstY = pivot.y - from.y
+    val secondX = to.x - pivot.x
+    val secondY = to.y - pivot.y
+    val angle = atan2(firstX * secondY - firstY * secondX, firstX * secondX + firstY * secondY)
+    return when {
+        angle > 0.12f -> 1f
+        angle < -0.12f -> -1f
+        else -> 0f
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,14 +146,65 @@ fun RouteScreen(
     onSpeedCapChanged: (Int) -> Unit,
     onIncrementSpeed: () -> Unit,
     onDecrementSpeed: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    onRouteDriveInput: (Float, Float) -> Unit,
+    onRouteStop: () -> Unit
 ) {
-    BackHandler { onBack() }
+    val waypoints = remember { mutableStateListOf<RoutePoint>() }
+    val scope = rememberCoroutineScope()
+    var playbackJob by remember { mutableStateOf<Job?>(null) }
+    var nextWaypoint by remember { mutableStateOf(1) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var isPaused by remember { mutableStateOf(false) }
+    fun stopPlayback(clearProgress: Boolean) {
+        playbackJob?.cancel()
+        playbackJob = null
+        isPlaying = false
+        isPaused = false
+        onRouteStop()
+        if (clearProgress) nextWaypoint = 1
+    }
+    fun prepareRouteEdit() {
+        if (isPaused) {
+            isPaused = false
+            nextWaypoint = 1
+            onRouteStop()
+        }
+    }
+    fun startPlayback() {
+        val route = prepareRoute(waypoints.toList())
+        if (route.size < 2 || isPlaying) return
+        if (nextWaypoint >= route.size) nextWaypoint = 1
+        isPlaying = true
+        isPaused = false
+        playbackJob = scope.launch {
+            while (nextWaypoint < route.size) {
+                val from = route[nextWaypoint - 1]
+                val to = route[nextWaypoint]
+                val dx = to.x - from.x
+                val dy = to.y - from.y
+                // The grid is a drawing surface, not a measured map. Treat each 40 px as
+                // roughly 320 ms of movement and cap segments to keep stops responsive.
+                val durationMs = (hypot(dx, dy) * 8f).toLong().coerceIn(120L, 1_500L)
+                // Follow the path with forward drive; use the path's change in heading
+                // to steer. Screen-space up/down changes must not become reverse commands.
+                onRouteDriveInput(1f, routeSteering(route, nextWaypoint))
+                delay(durationMs)
+                onRouteStop()
+                nextWaypoint++
+            }
+            isPlaying = false
+            isPaused = false
+            playbackJob = null
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose { playbackJob?.cancel(); onRouteStop() }
+    }
+    BackHandler { stopPlayback(clearProgress = true); onBack() }
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-
-    val waypoints = remember { mutableStateListOf<RoutePoint>() }
 
     val totalPathDistance = remember(waypoints.size) {
         if (waypoints.size < 2) 0f
@@ -150,31 +263,46 @@ fun RouteScreen(
 
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // Nodes & length stats badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(DarkSurfaceElevated)
-                                .border(1.dp, OutlineBorder, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "${waypoints.size} NODES | ${totalPathDistance.toInt()} px",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontFamily = FontFamily.Monospace,
-                                    color = CyanAccent,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.SemiBold
+                        Column(horizontalAlignment = Alignment.End) {
+                            OutlinedButton(
+                                onClick = { stopPlayback(clearProgress = true) },
+                                enabled = isPlaying || isPaused || nextWaypoint > 1,
+                                modifier = Modifier.height(30.dp),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                                shape = RoundedCornerShape(7.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(13.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Stop", fontSize = 10.sp)
+                            }
+                            Spacer(modifier = Modifier.height(3.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DarkSurfaceElevated)
+                                    .border(1.dp, OutlineBorder, RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "${waypoints.size} NODES | ${totalPathDistance.toInt()} px",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontFamily = FontFamily.Monospace,
+                                        color = CyanAccent,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
                                 )
-                            )
+                            }
                         }
 
                         Spacer(modifier = Modifier.width(8.dp))
 
                         IconButton(
                             onClick = {
+                                prepareRouteEdit()
                                 if (waypoints.isNotEmpty()) waypoints.removeAt(waypoints.lastIndex)
                             },
-                            enabled = waypoints.isNotEmpty(),
+                            enabled = waypoints.isNotEmpty() && !isPlaying,
                             modifier = Modifier.size(34.dp)
                         ) {
                             Icon(
@@ -186,8 +314,8 @@ fun RouteScreen(
                         }
 
                         IconButton(
-                            onClick = { waypoints.clear() },
-                            enabled = waypoints.isNotEmpty(),
+                            onClick = { prepareRouteEdit(); waypoints.clear() },
+                            enabled = waypoints.isNotEmpty() && !isPlaying,
                             modifier = Modifier.size(34.dp)
                         ) {
                             Icon(
@@ -203,6 +331,8 @@ fun RouteScreen(
                 // Spacious Drawing Canvas Arena (occupies remaining height)
                 RouteDrawingCanvasBox(
                     waypoints = waypoints,
+                    enabled = !isPlaying,
+                    onEdit = { prepareRouteEdit() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -258,7 +388,7 @@ fun RouteScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Execution locked until route packet format is confirmed in Diagnostics.",
+                            text = "Estimated timing from drawn distance; test at low speed in an open area.",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextPrimary,
                                 fontSize = 10.sp,
@@ -271,53 +401,33 @@ fun RouteScreen(
                 // Playback Controls
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Button(
-                        onClick = {},
-                        enabled = false,
+                        onClick = {
+                            if (isPlaying) {
+                                stopPlayback(clearProgress = false)
+                                isPaused = true
+                            } else {
+                                startPlayback()
+                            }
+                        },
+                        enabled = waypoints.size >= 2,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(40.dp),
+                        .height(54.dp),
                         colors = ButtonDefaults.buttonColors(
+                            containerColor = RouteStartGreen,
+                            contentColor = Color.White,
                             disabledContainerColor = DarkSurfaceElevated,
                             disabledContentColor = TextMuted
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Start Route", fontSize = 12.sp)
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause route" else if (isPaused) "Resume route" else "Start route",
+                            modifier = Modifier.size(28.dp)
+                        )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Pause", fontSize = 11.sp)
-                        }
-
-                        Button(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(38.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                disabledContainerColor = DarkSurfaceElevated,
-                                disabledContentColor = TextMuted
-                            ),
-                            shape = RoundedCornerShape(8.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Stop", fontSize = 11.sp)
-                        }
-                    }
                 }
             }
         }
@@ -344,9 +454,10 @@ fun RouteScreen(
                     actions = {
                         IconButton(
                             onClick = {
+                                prepareRouteEdit()
                                 if (waypoints.isNotEmpty()) waypoints.removeAt(waypoints.lastIndex)
                             },
-                            enabled = waypoints.isNotEmpty()
+                            enabled = waypoints.isNotEmpty() && !isPlaying
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Undo,
@@ -355,8 +466,8 @@ fun RouteScreen(
                             )
                         }
                         IconButton(
-                            onClick = { waypoints.clear() },
-                            enabled = waypoints.isNotEmpty()
+                            onClick = { prepareRouteEdit(); waypoints.clear() },
+                            enabled = waypoints.isNotEmpty() && !isPlaying
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Delete,
@@ -392,35 +503,51 @@ fun RouteScreen(
                         modifier = Modifier.widthIn(max = 240.dp)
                     )
 
-                    Column(
-                        horizontalAlignment = Alignment.End,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(DarkSurfaceElevated)
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = "NODES: ${waypoints.size}",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                color = CyanAccent,
-                                fontSize = 11.sp
+                    Column(horizontalAlignment = Alignment.End) {
+                        OutlinedButton(
+                            onClick = { stopPlayback(clearProgress = true) },
+                            enabled = isPlaying || isPaused || nextWaypoint > 1,
+                            modifier = Modifier.height(34.dp),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Stop", fontSize = 11.sp)
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Column(
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DarkSurfaceElevated)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "NODES: ${waypoints.size}",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = CyanAccent,
+                                    fontSize = 11.sp
+                                )
                             )
-                        )
-                        Text(
-                            text = "DIST: ${totalPathDistance.toInt()} px",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontFamily = FontFamily.Monospace,
-                                color = TextMuted,
-                                fontSize = 10.sp
+                            Text(
+                                text = "DIST: ${totalPathDistance.toInt()} px",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontFamily = FontFamily.Monospace,
+                                    color = TextMuted,
+                                    fontSize = 10.sp
+                                )
                             )
-                        )
+                        }
                     }
                 }
 
                 // Drawing Canvas Arena (taking remaining portrait height comfortably)
                 RouteDrawingCanvasBox(
                     waypoints = waypoints,
+                    enabled = !isPlaying,
+                    onEdit = { prepareRouteEdit() },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
@@ -448,7 +575,7 @@ fun RouteScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Protocol calibration required — Execution disabled until confirmed.",
+                            text = "Estimated route timing — drawn distance is not a measured scale. Start slowly in an open area.",
                             style = MaterialTheme.typography.labelSmall.copy(
                                 color = TextPrimary,
                                 fontSize = 11.sp
@@ -458,56 +585,32 @@ fun RouteScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    Button(
+                        onClick = {
+                            if (isPlaying) {
+                                stopPlayback(clearProgress = false)
+                                isPaused = true
+                            } else {
+                                startPlayback()
+                            }
+                        },
+                        enabled = waypoints.size >= 2,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(54.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = RouteStartGreen,
+                            contentColor = Color.White,
+                            disabledContainerColor = DarkSurfaceElevated,
+                            disabledContentColor = TextMuted
+                        ),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Button(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .weight(1.2f)
-                                .height(44.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                disabledContainerColor = DarkSurfaceElevated,
-                                disabledContentColor = TextMuted
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Start Route", fontSize = 12.sp)
-                        }
-
-                        OutlinedButton(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Pause", fontSize = 11.sp)
-                        }
-
-                        Button(
-                            onClick = {},
-                            enabled = false,
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(44.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                disabledContainerColor = DarkSurfaceElevated,
-                                disabledContentColor = TextMuted
-                            ),
-                            shape = RoundedCornerShape(10.dp)
-                        ) {
-                            Icon(imageVector = Icons.Default.Stop, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Stop", fontSize = 11.sp)
-                        }
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (isPlaying) "Pause route" else if (isPaused) "Resume route" else "Start route",
+                            modifier = Modifier.size(30.dp)
+                        )
                     }
                 }
             }
@@ -518,6 +621,8 @@ fun RouteScreen(
 @Composable
 private fun RouteDrawingCanvasBox(
     waypoints: MutableList<RoutePoint>,
+    enabled: Boolean = true,
+    onEdit: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -525,9 +630,10 @@ private fun RouteDrawingCanvasBox(
             .clip(RoundedCornerShape(16.dp))
             .background(DarkSurface)
             .border(1.5.dp, OutlineBorder, RoundedCornerShape(16.dp))
-            .pointerInput(Unit) {
-                detectDragGestures(
+            .pointerInput(enabled) {
+                if (enabled) detectDragGestures(
                     onDragStart = { offset ->
+                        onEdit()
                         waypoints.add(RoutePoint(offset.x, offset.y))
                     },
                     onDrag = { change, _ ->

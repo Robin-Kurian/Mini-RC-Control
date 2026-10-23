@@ -74,6 +74,7 @@ fun SlidersDriveControl(
     onReleased: () -> Unit,
     modifier: Modifier = Modifier,
     isLandscape: Boolean = true,
+    controlsSwapped: Boolean = false,
     centerContent: (@Composable () -> Unit)? = null
 ) {
     val sliderState = remember { SliderState() }
@@ -81,6 +82,7 @@ fun SlidersDriveControl(
     if (isLandscape) {
         Row(
             modifier = modifier.fillMaxSize(),
+            horizontalArrangement = controlSideArrangement(controlsSwapped),
             verticalAlignment = Alignment.CenterVertically
         ) {
             VerticalThrottleSlider(
@@ -131,7 +133,7 @@ fun SlidersDriveControl(
             val sliderHeight = (maxHeight * 0.9f - 12.dp).coerceAtLeast(0.dp)
             Row(
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp).height(sliderHeight),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = controlSideArrangement(controlsSwapped, Arrangement.spacedBy(8.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 VerticalThrottleSlider(

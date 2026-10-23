@@ -275,6 +275,18 @@ class TankViewModel(
         dispatchDriveToBle(state)
     }
 
+    /** Route playback uses the same verified broadcast command path as the manual controls. */
+    fun onRouteDriveInput(throttle: Float, steering: Float) {
+        val state = driveController.updateSliders(
+            throttleDeltaY = -throttle.coerceIn(-1f, 1f),
+            maxThrottleTravel = 1f,
+            steeringDeltaX = steering.coerceIn(-1f, 1f),
+            maxSteeringTravel = 1f
+        )
+        syncDriveState()
+        dispatchDriveToBle(state)
+    }
+
     fun onGyroEngage(active: Boolean) {
         _uiState.update { it.copy(gyroActive = active) }
         if (active) {

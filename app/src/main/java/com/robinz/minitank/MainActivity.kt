@@ -115,7 +115,9 @@ fun TankApp(viewModel: TankViewModel) {
                 onSpeedCapChanged = { viewModel.setSpeedCapPercent(it) },
                 onIncrementSpeed = { viewModel.incrementSpeedCap() },
                 onDecrementSpeed = { viewModel.decrementSpeedCap() },
-                onBack = { viewModel.setShowRouteScreen(false) }
+                onBack = { viewModel.setShowRouteScreen(false) },
+                onRouteDriveInput = { throttle, steering -> viewModel.onRouteDriveInput(throttle, steering) },
+                onRouteStop = { viewModel.onDriveReleased() }
             )
         }
         else -> {
